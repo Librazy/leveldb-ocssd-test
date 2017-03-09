@@ -24,6 +24,26 @@ public:
         printf(DBG "%s: next_file_number: %lu\n", str, vset->next_file_number_);
     };
 
+    static void GetVersionSetDBStatus(const char *str, VersionSet *vset) {
+        printf(DBG "%s:\n", str);
+        Version *curr = vset->current_;
+        int numlevel[config::kNumLevels];
+        for (int level = 0; level < config::kNumLevels; level++) {
+            numlevel[level] = curr->files_[level].size();
+            if (numlevel[level] > 0) {
+                printf(" L%d: %d\n", level, numlevel[level]);
+                    
+                std::vector<FileMetaData *>::iterator itr = curr->files_[level].begin();
+                int i = 0;
+                while (itr != curr->files_[level].end()) {
+                    printf("  File_%d:, %llu, [%s - %s]\n", i,(*itr)->number, (*itr)->smallest.user_key().data(), (*itr)->largest.user_key().data());
+                    ++itr;
+                    i++;
+                }
+            }
+        }
+    };
+
     static void Pr_VersionEdit(const char *str, VersionEdit *ve) {
         printf(DBG "%s： versionset\n", str);
         printf(" comparator_: %s,\n" 

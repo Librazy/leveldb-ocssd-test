@@ -25,10 +25,7 @@ struct oc_file_descriptor;
 class ocssd {  //an ocssd device
 public:
 	ocssd();
-	~ocssd()
-	{
-		Cleanup();
-	}
+	~ocssd();
 	void Setup();
 	void Cleanup();
 	leveldb::Status NewOCFile(oc_file **ret);

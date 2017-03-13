@@ -24,15 +24,42 @@ enum PageAllocPolicy{
 
 const ChunkingAlgor kChunkingAlgor = kRaid0;
 const GCPolicy kGCPolicy = kOneLunSerial;
-const PageAllocPolicy kPageAllocPolicy = kRoundRobin_Flexible;
+const PageAllocPolicy kPageAllocPolicy = kRoundRobin_Fixed;
 };
 
 
 
 
-class oc_block_manager {
+class oc_block_manager { //alloc in a granularity of <Block>
 public:
-	uint64_t AllocPPA()
+	typedef uint32_t LunAndPlane_t;
+	//REQUIRE: Lun and Pl's type should be 32-length
+	#define MakeLunAndPlane(Lun, Pl) ({ \
+			uint32_t l = Lun;       \
+			uint32_t p = Pl;        \
+			uint32_t lap = (l << 16) | p; \
+			lap; \
+			})
+
+	#define GetLun(lap) ({ uint32_t mask = ((uint32_t)1 << 16) - 1; \
+			(lap & (mask << 16)) >> 16; \
+			})
+
+	#define GetPlane(lap) ({ uint32_t mask = ((uint32_t)1 << 16) - 1; \
+			lap & mask; \
+			})
+
+
+	struct AllocBlkDes{
+	};
+
+	struct Options{
+
+	};
+	/*
+	 * @approximate_size - how many bytes to alloc(approximately)
+	 */
+	struct AllocBlkDes AllocBlocks(size_t approximate_size)
 	{
 		return 0;
 	}
@@ -42,9 +69,6 @@ private:
 	 *  1. a file can be discontinuous in lun : (a file's size is changable at any time: support Append as a FS?)
 	 *  2. chunk size is flexible to each incoming request or fixed by a definition before ?
 	 * 
-	 *  3.12-by-ywj:
-	 *  1. not support size-changable file(NOT like a gerneric filesystem): leveldb_file's size is actually fixed.
-	 *  2. support flexible chunk_size: will good to leveldb's compaction.(WILL bring MORE overhead) 
 	 */
 
 	struct pap_rr_usage_meta{
@@ -58,17 +82,18 @@ private:
 	{
 	}
 
-	static New_oc_block_manager()
+	static oc_block_manager* New_oc_block_manager()
 	{
 	}
 	
 
-	
+
 
 
 	ocssd * const ssd_;
 	const struct nvm_geo * const geo_;
-	PageAllocPolicy pap_;
+
+	struct Options opt_;
 	leveldb::Status s;
 };
 

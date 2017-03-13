@@ -65,9 +65,10 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 		}
 		TEST_My_nvm_bbt_pr(i, ptr);
 	}
+	return leveldb::Status::OK();
+
 	BBT_ERR:
 	return leveldb::Status::IOError("get BBT", strerror(errno));
-
 }
 
 void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)

@@ -10,7 +10,10 @@ int ocblkmng()
 		printf("ocssd construct failed: %s.\n", ssd.s.ToString().c_str()); 
 	}
 	ssd.TEST_Get_BLK_MNG()->TEST_Pr_Opt_Meta();
-
+	leveldb::Status s = ssd.TEST_Get_BLK_MNG()->TEST_Pr_BBT();
+	if (!s.ok()) {
+		printf("ocssd Blk Mng pr BBT failed: %s.\n", s.ToString().c_str()); 
+	}
 	return 0;
 }
 

@@ -23,12 +23,12 @@ namespace ocssd {
 /*
  * @approximate_size - how many bytes to alloc(approximately)
  */
-struct AllocBlkDes oc_block_manager::AllocBlocks(size_t approximate_size)
+leveldb::Status oc_block_manager::AllocBlocks(size_t approximate_size, oc_block_manager::AllocBlkDes *abd)
 {
-	return 0;
+	return leveldb::Status::OK();
 }
 
-leveldb::Status oc_block_manager::FreeBlocks(struct AllocBlkDes blks)
+leveldb::Status oc_block_manager::FreeBlocks(oc_block_manager::AllocBlkDes* blks)
 {
 	return leveldb::Status::OK();
 }
@@ -50,13 +50,27 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 	nvm_addr_pr(rr_u_meta_.next_block);
 }
 
-void oc_block_manager::TEST_Pr_BBT()
+leveldb::Status oc_block_manager::TEST_Pr_BBT()
 {
-
+	int i;
+	struct nvm_addr lun_addr;
+	struct nvm_ret ret;
+	const struct nvm_bbt *ptr;
+	for (i = 0; i < geo_->nluns; i++) {
+		lun_addr.ppa = 0;
+		lun_addr.g.lun = i;
+		ptr = nvm_bbt_get(ssd_->dev_, lun_addr, &ret);
+		if (!ptr) {
+			goto BBT_ERR;
+		}
+		TEST_My_nvm_bbt_pr(i, ptr);
+	}
+	BBT_ERR:
+	return leveldb::Status::IOError("get BBT", strerror(errno));
 
 }
 
-void oc_block_manager::TEST_My_nvm_bbt_pr(const struct nvm_bbt *bbt)
+void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 {
 	int nnotfree = 0;
 	const int Pr_num = 4;
@@ -65,7 +79,7 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(const struct nvm_bbt *bbt)
 		printf("bbt { NULL }\n");
 		return;
 	}
-
+	printf("LUN:%d", lun);
 	printf("bbt {\n");
 	printf("  addr"); nvm_addr_pr(bbt->addr);
 	printf("  nblks(%lu) {", bbt->nblks);
@@ -87,8 +101,6 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(const struct nvm_bbt *bbt)
 			printf("\n....");
 			pr_sr = 1;
 		}
-
-
 	}
 	printf("\n  }\n");
 	printf("  #notfree(%d)\n", nnotfree);
@@ -98,17 +110,17 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(const struct nvm_bbt *bbt)
 void oc_block_manager::def_ocblk_opt(struct Options *opt)
 {
 	opt->chunk_size = geo_->npages * geo_->page_nbytes; //block's size in bytes
-	opt->policy = oc_options::kAddrAllocPolicy;
+	opt->policy = oc_options::kRoundRobin_Fixed;
 	opt->bbt_cached = true;
 }
 
-void oc_block_manager::clean_all_set_free()
+void oc_block_manager::Clean()
 {
 
 }
 
 
-oc_block_manager::oc_block_manager(ocssd *ssd)： ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
+oc_block_manager::oc_block_manager(ocssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
 {
 	def_ocblk_opt(&opt_);
 	if (opt_.bbt_cached) {
@@ -116,12 +128,13 @@ oc_block_manager::oc_block_manager(ocssd *ssd)： ssd_(ssd), geo_(nvm_dev_get_ge
 			s = leveldb::Status::IOError("oc_blk_mng: set bbt_cached", strerror(errno));
 		}
 	}
+	Clean();
 }
 
 /*
  * 
  */
-static leveldb::Status oc_block_manager::New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr)
+leveldb::Status oc_block_manager::New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr)
 {
 	oc_block_manager *ptr = new oc_block_manager(ssd);
 	*oc_blk_mng_ptr = ptr->ok() ? ptr : NULL;

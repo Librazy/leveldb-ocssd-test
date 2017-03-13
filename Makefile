@@ -35,6 +35,7 @@ TESTS = \
 	db/version_set_test \
 	db/write_batch_test \
 	db/OCSSD/ocssd_test \
+	db/OCSSD/ocssd_oc_blk_mng_test \
 	helpers/memenv/memenv_test \
 	issues/issue178_test \
 	issues/issue200_test \
@@ -406,6 +407,10 @@ $(SHARED_OUTDIR)/db_bench:$(SHARED_OUTDIR)/db/db_bench.o $(SHARED_LIBS) $(TESTUT
 
 $(STATIC_OUTDIR)/ocssd_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_test.o $(STATIC_LIBOBJECTS)
 	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/OCSSD/ocssd_test.cc $(STATIC_LIBOBJECTS) -o $@ $(LIBS)
+
+$(STATIC_OUTDIR)/ocssd_oc_blk_mng_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_oc_blk_mng_test.o $(STATIC_LIBOBJECTS)
+	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/OCSSD/ocssd_oc_blk_mng_test.cc $(STATIC_LIBOBJECTS) -o $@ $(LIBS)
+
 
 .PHONY: run-shared
 run-shared: $(SHARED_OUTDIR)/db_bench

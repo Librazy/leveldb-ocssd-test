@@ -20,9 +20,11 @@ namespace leveldb {
 
 namespace ocssd {
 
+
 class oc_file;
 class oc_block_manager;
 struct oc_file_descriptor;
+
 
 class ocssd {  //an ocssd device
 public:
@@ -30,6 +32,10 @@ public:
 	~ocssd();
 	void Setup();
 	void Cleanup();
+	bool ok()
+	{
+		return s.ok();
+	}
 	leveldb::Status NewOCFile(oc_file **ret);
 
 	struct ocssd_descriptor {
@@ -40,6 +46,12 @@ public:
 		}
 	};
 
+	oc_block_manager* TEST_Get_BLK_MNG()
+	{
+		return blkmng_;
+	}
+public:
+	leveldb::Status s;
 
 private:
 	friend class oc_block_manager;
@@ -47,7 +59,7 @@ private:
 	struct nvm_dev *dev_;
 	struct ocssd_descriptor *des_;
 	oc_block_manager *blkmng_;
-	leveldb::Status s;
+	
 
 
 	void EncodeTo(struct ocssd_descriptor *ocdes, char *buf);

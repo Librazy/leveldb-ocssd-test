@@ -13,6 +13,8 @@
 #include "liblightnvm.h"
 #include "nvm.h"
 
+#define BOOL2STR(b) ((b) ? "true" : "false")
+
 
 namespace leveldb {
 

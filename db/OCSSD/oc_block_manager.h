@@ -3,9 +3,10 @@
 
 #include "ocssd.h"
 #include "oc_options.h"
+#include "oc_gc.h"
 
 
-//OCSSD Headers
+//liblightnvm Headers
 #include "liblightnvm.h"
 #include "nvm.h"
 
@@ -18,6 +19,7 @@ namespace leveldb {
 namespace ocssd {
 
 class ocssd;
+class oc_GC;
 
 class oc_block_manager { //allocation is done in a granularity of <Block>
 public:
@@ -61,6 +63,7 @@ private:
 		}
 	};
 	friend class ocssd;
+	friend class oc_GC;
 
 	void def_ocblk_opt(struct Options *opt);
 	void InitClean();

@@ -9,7 +9,7 @@
 #include "port/port.h"
 #include "port/thread_annotations.h"
 
-//OCSSD Headers
+//liblightnvm Headers
 #include "liblightnvm.h"
 #include "nvm.h"
 
@@ -24,7 +24,7 @@ namespace ocssd {
 class oc_file;
 class oc_block_manager;
 struct oc_file_descriptor;
-
+class oc_GC;
 
 class ocssd {  //an ocssd device
 public:
@@ -55,6 +55,7 @@ public:
 
 private:
 	friend class oc_block_manager;
+	friend class oc_GC;
 
 	struct nvm_dev *dev_;
 	int pmode_;

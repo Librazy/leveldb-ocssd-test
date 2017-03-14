@@ -1,16 +1,17 @@
 #include "oc_block_manager.h"
-
 #include <cassert>
 
 namespace leveldb {
 namespace ocssd {
 
 namespace {
-nvm_bbt_state BLK_UNUSED = NVM_BBT_FREE;
-nvm_bbt_state BLK_USED = NVM_BBT_HMRK;
-nvm_bbt_state BLK_INVALID = NVM_BBT_GBAD;
+const uint16_t BLK_UNUSED = NVM_BBT_FREE;
+const uint16_t BLK_USED = NVM_BBT_HMRK;
+const uint16_t BLK_INVALID = NVM_BBT_GBAD;
 
-/*
+/* 
+ * The flags transition 
+ *  
  *             write_opr                 update_opr/remove_opr
  * BLK_UNUSED --------------> BLK_USED --------------------->BLK_INVALID
  *     |                                                       |
@@ -18,6 +19,8 @@ nvm_bbt_state BLK_INVALID = NVM_BBT_GBAD;
  *     				erase_opr
  */
 };
+
+
 static void my_nvm_bbt_state_pr(int state)
 {
 	switch (state) {
@@ -90,13 +93,8 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 	struct nvm_addr lun_addr;
 	struct nvm_ret ret;
 	const struct nvm_bbt *ptr;
-	for (i = 0; i < geo_->nluns; i++) {
-		lun_addr.ppa = 0;
-		lun_addr.g.lun = i;
-		ptr = nvm_bbt_get(ssd_->dev_, lun_addr, &ret);
-		if (!ptr) {
-			goto BBT_ERR;
-		}
+	for (i = 0; i < bbts_length_; i++) {
+		ptr = bbts_[i];
 		TEST_My_nvm_bbt_pr(i, ptr);
 	}
 	return leveldb::Status::OK();
@@ -157,8 +155,13 @@ void oc_block_manager::def_ocblk_opt(struct Options *opt)
 void oc_block_manager::InitClean()
 {
 	//Erase
-
-
+	for (int i = 0; i < geo_->nluns; ++i) {
+		printf("oc_block_manager::InitClean, Lun %d\n", i);
+		s = oc_GC::EraseByLun(0, i, this);
+	}
+	if (!s.ok()) {
+		return;
+	}
 	//Set BBTs
 
 }
@@ -175,7 +178,7 @@ void oc_block_manager::InitBBTs()
 	assert(opt_.bbt_cached); //now only support bbt cached.
 
 	if (opt_.bbt_cached) {
-		if (nvm_dev_set_bbts_cached(ssd->dev_, 1)) {
+		if (nvm_dev_set_bbts_cached(ssd_->dev_, 1)) {
 			s = leveldb::Status::IOError("oc_blk_mng: set bbt_cached", strerror(errno));
 		}
 	}

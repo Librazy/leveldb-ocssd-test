@@ -9,6 +9,22 @@
 namespace leveldb {
 namespace ocssd {
 
+static void TEST_Pr_pmode(int pmode)
+{
+	const char *str;
+	switch (pmode) {
+	case NVM_FLAG_PMODE_SNGL:
+		str = "NVM_FLAG_PMODE_SNGL";break;
+	case NVM_FLAG_PMODE_DUAL:
+		str = "NVM_FLAG_PMODE_DUAL";break;
+	case NVM_FLAG_PMODE_QUAD:
+		str = "NVM_FLAG_PMODE_QUAD";break;
+	default:
+		str = "ERRORPMODE";break;
+	}
+	printf("%s\n", str);
+}
+
 static bool pmode_is_good(int pmode)
 {
 	switch (pmode) {
@@ -45,10 +61,9 @@ void ocssd::Setup()
 
 	//plane access mode
 	pmode_ = nvm_dev_get_pmode(dev_);
-	if(!pmode_is_good(pmode_)){
+	if(!pmode_is_good(pmode_)){	///To be clean - is not necessary ?
 		s = Status::IOError("OCSSD get pmode error");
 	}
-
 
 }
 void ocssd::Cleanup()

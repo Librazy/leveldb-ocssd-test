@@ -1,7 +1,6 @@
 #ifndef YWJ_OCSSD_OC_OPTIONS_H
 #define YWJ_OCSSD_OC_OPTIONS_H
 namespace leveldb {
-
 namespace ocssd {
 
 namespace oc_options{

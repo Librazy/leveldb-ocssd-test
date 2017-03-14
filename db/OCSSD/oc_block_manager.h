@@ -26,6 +26,7 @@ public:
 
 
 	typedef uint32_t LunAndPlane_t;
+	typedef uint8_t BlkState_t;
 
 	struct AllocBlkDes {
 	};
@@ -62,6 +63,8 @@ private:
 			next_block.ppa = 0;
 		}
 	};
+	
+
 	friend class ocssd;
 	friend class oc_GC;
 
@@ -81,6 +84,9 @@ private:
 	const struct nvm_geo *const geo_;
 	struct nvm_bbt **bbts_;
 	int bbts_length_;
+
+
+
 	struct rr_usage_meta rr_u_meta_;
 	struct Options opt_;
 	leveldb::Status s;

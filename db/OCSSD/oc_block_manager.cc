@@ -5,9 +5,10 @@ namespace leveldb {
 namespace ocssd {
 
 namespace {
-const uint16_t BLK_UNUSED = NVM_BBT_FREE;
-const uint16_t BLK_USED = NVM_BBT_HMRK;
-const uint16_t BLK_INVALID = NVM_BBT_GBAD;
+
+const oc_block_manager::BlkState_t BLK_UNUSED = NVM_BBT_FREE; 
+const oc_block_manager::BlkState_t BLK_USED = NVM_BBT_HMRK;
+const oc_block_manager::BlkState_t BLK_INVALID = NVM_BBT_GBAD;
 
 /* 
  * The flags transition 
@@ -16,9 +17,32 @@ const uint16_t BLK_INVALID = NVM_BBT_GBAD;
  * BLK_UNUSED --------------> BLK_USED --------------------->BLK_INVALID
  *     |                                                       |
  *     |<------------------------------------------------------|
- *     				erase_opr
+ *     				          erase_opr
  */
 };
+
+/* 
+ * Virtual BBT: 
+ *  		  L0    L2   L3   L4
+ *  		  p0p1  p0p1 p0p1 p0p1	    
+ * B0   =     = =   = =  = =  = =
+ * B1   =     = =   = =  = =  = =
+ * B2   =     = =   = =  = =  = =
+ * B3   =     = =   = =  = =  = =
+ * ......
+ * Bn   =     = =   = =  = =  = = 
+ * 			  BBT0  BBT1 BBT2 BBT3 
+ */
+
+static inline int _idx_bbt()
+{
+
+}
+
+static inline int _idx_blk()
+{
+
+}
 
 
 static void my_nvm_bbt_state_pr(int state)
@@ -160,10 +184,14 @@ void oc_block_manager::InitClean()
 		s = oc_GC::EraseByLun(0, i, this);
 	}
 	if (!s.ok()) {
-		return;
+		goto OUT;
 	}
+
 	//Set BBTs
 
+
+OUT:
+	return;
 }
 
 /*

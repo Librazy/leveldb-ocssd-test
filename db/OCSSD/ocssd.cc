@@ -9,7 +9,17 @@
 namespace leveldb {
 namespace ocssd {
 
-
+static bool pmode_is_good(int pmode)
+{
+	switch (pmode) {
+		case NVM_FLAG_PMODE_SNGL:
+		case NVM_FLAG_PMODE_DUAL:
+		case NVM_FLAG_PMODE_QUAD:
+			return true;
+		default:
+			return false;
+	}
+}
 
 
 ocssd::ocssd() : des_(new ocssd_descriptor(oc_options::kDevPath)), dev_(NULL)
@@ -26,10 +36,20 @@ ocssd::~ocssd()
 
 void ocssd::Setup()
 {
+	//Open device
 	dev_ = nvm_dev_open(des_->dev_path_.c_str());
 	if (!dev_) {
 		s = Status::IOError("OCSSD Setup", strerror(errno));
+		return;
 	}
+
+	//plane access mode
+	pmode_ = nvm_dev_get_pmode(dev_);
+	if(!pmode_is_good(pmode_)){
+		s = Status::IOError("OCSSD get pmode error");
+	}
+
+
 }
 void ocssd::Cleanup()
 {

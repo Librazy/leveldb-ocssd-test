@@ -57,6 +57,7 @@ private:
 	friend class oc_block_manager;
 
 	struct nvm_dev *dev_;
+	int pmode_;
 	struct ocssd_descriptor *des_;
 	oc_block_manager *blkmng_;
 	

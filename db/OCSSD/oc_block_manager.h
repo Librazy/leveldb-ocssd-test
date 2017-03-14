@@ -21,10 +21,13 @@ class ocssd;
 
 class oc_block_manager { //allocation is done in a granularity of <Block>
 public:
+
+
 	typedef uint32_t LunAndPlane_t;
 
 	struct AllocBlkDes {
 	};
+
 
 	/*
 	 * @approximate_size - how many bytes to alloc(approximately)
@@ -60,8 +63,9 @@ private:
 	friend class ocssd;
 
 	void def_ocblk_opt(struct Options *opt);
-	void Clean();
-
+	void InitClean();
+	void InitBBTs();
+	void Init();
 
 	oc_block_manager(ocssd *ssd);
 
@@ -72,7 +76,8 @@ private:
 
 	ocssd *const ssd_;
 	const struct nvm_geo *const geo_;
-
+	struct nvm_bbt **bbts_;
+	int bbts_length_;
 	struct rr_usage_meta rr_u_meta_;
 	struct Options opt_;
 	leveldb::Status s;

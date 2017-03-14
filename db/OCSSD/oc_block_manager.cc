@@ -1,7 +1,41 @@
 #include "oc_block_manager.h"
 
+#include <cassert>
+
 namespace leveldb {
 namespace ocssd {
+
+namespace {
+nvm_bbt_state BLK_UNUSED = NVM_BBT_FREE;
+nvm_bbt_state BLK_USED = NVM_BBT_HMRK;
+nvm_bbt_state BLK_INVALID = NVM_BBT_GBAD;
+
+/*
+ *             write_opr                 update_opr/remove_opr
+ * BLK_UNUSED --------------> BLK_USED --------------------->BLK_INVALID
+ *     |                                                       |
+ *     |<------------------------------------------------------|
+ *     				erase_opr
+ */
+};
+static void my_nvm_bbt_state_pr(int state)
+{
+	switch (state) {
+	case BLK_UNUSED:
+		printf("B_00(%d)", state);
+		break;
+	case BLK_USED:
+		printf("B_##(%d)", state);
+		break;
+	case BLK_INVALID:
+		printf("B_!!(%d)", state);
+		break;
+	default:
+		nvm_bbt_state_pr(state);
+		break;
+	}
+}
+
 
 //REQUIRE: Lun and Pl's type should be 32-length
 #define MakeLunAndPlane(Lun, Pl) ({ \
@@ -28,7 +62,7 @@ leveldb::Status oc_block_manager::AllocBlocks(size_t approximate_size, oc_block_
 	return leveldb::Status::OK();
 }
 
-leveldb::Status oc_block_manager::FreeBlocks(oc_block_manager::AllocBlkDes* blks)
+leveldb::Status oc_block_manager::FreeBlocks(oc_block_manager::AllocBlkDes *blks)
 {
 	return leveldb::Status::OK();
 }
@@ -67,8 +101,8 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 	}
 	return leveldb::Status::OK();
 
-	BBT_ERR:
-	return leveldb::Status::IOError("get BBT", strerror(errno));
+BBT_ERR:
+	return leveldb::Status::IOError("Get BBT", strerror(errno));
 }
 
 void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
@@ -90,7 +124,7 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 			|| i == bbt->nblks - bbt->dev->geo.nplanes/*last one*/) {
 			printf("\n    blk(%04d): [ ", blk);
 			for (int blk = i; blk < (i + bbt->dev->geo.nplanes); ++blk) {
-				nvm_bbt_state_pr(bbt->blks[blk]);
+				my_nvm_bbt_state_pr(bbt->blks[blk]);
 				printf(" ");
 				if (bbt->blks[blk]) {
 					++nnotfree;
@@ -115,21 +149,65 @@ void oc_block_manager::def_ocblk_opt(struct Options *opt)
 	opt->bbt_cached = true;
 }
 
-void oc_block_manager::Clean()
+//TODO - BBT_Management_Basic_Workflow: Get dev->bbts[...], Maintain, Flush
+
+/*
+ * Erase all blocks and set the corresponding BBT entry as free
+ */
+void oc_block_manager::InitClean()
 {
+	//Erase
+
+
+	//Set BBTs
 
 }
 
-
-oc_block_manager::oc_block_manager(ocssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
+/*
+ * 
+ */
+void oc_block_manager::InitBBTs()
 {
-	def_ocblk_opt(&opt_);
+	int i;
+	struct nvm_addr lun_addr;
+	struct nvm_ret ret;
+	const struct nvm_bbt *ptr;
+	assert(opt_.bbt_cached); //now only support bbt cached.
+
 	if (opt_.bbt_cached) {
 		if (nvm_dev_set_bbts_cached(ssd->dev_, 1)) {
 			s = leveldb::Status::IOError("oc_blk_mng: set bbt_cached", strerror(errno));
 		}
 	}
-	Clean();
+
+	if (s.ok()) {
+		for (i = 0; i < geo_->nluns; i++) {
+			lun_addr.ppa = 0;
+			lun_addr.g.lun = i;
+			ptr = nvm_bbt_get(ssd_->dev_, lun_addr, &ret);
+			if (!ptr) {
+				goto BBT_ERR;
+			}
+		}
+		bbts_ = ssd_->dev_->bbts;
+		bbts_length_ = geo_->nchannels * geo_->nluns; //sum of the LUNs.
+	}
+	return; //ok, then we can maintan the bbts now.
+
+BBT_ERR:
+	s = leveldb::Status::IOError("oc_blk_mng: get bbts", strerror(errno));
+}
+
+void oc_block_manager::Init()
+{
+	InitBBTs();
+	InitClean();
+}
+
+oc_block_manager::oc_block_manager(ocssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
+{
+	def_ocblk_opt(&opt_);
+	Init();
 }
 
 /*

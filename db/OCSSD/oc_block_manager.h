@@ -31,10 +31,34 @@ public:
 	typedef uint32_t LunAndPlane_t;
 	typedef uint8_t BlkState_t;
 
-	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks
-		LunAndPlane_t st;
-		LunAndPlane_t ed;
-		int blk_num_st;
+	struct rr_addr { //RoundRobin address format
+		LunAndPlane_t lap;
+		uint32_t block;
+		rr_addr() : lap(0), block(0){ }
+
+		bool ok(const struct nvm_geo *limit);
+		rr_addr& Increment(const struct nvm_geo *limit);
+		rr_addr& Increment(size_t blks, const struct nvm_geo *limit);
+		size_t Minus(const rr_addr& rhs, const struct nvm_geo *limit);
+		
+		bool operator<=(const rr_addr& rhs);
+		rr_addr& operator=(const rr_addr& rhs);
+	};
+
+	struct Itr_rr_addr { //Iterator of RoundRobin address
+		size_t blks;
+		struct rr_addr st;
+		struct rr_addr ed;
+		const struct nvm_geo *limit;
+		Itr_rr_addr(struct rr_addr s, struct rr_addr e, const struct nvm_geo *g): st(s), ed(e), blks(e.Minus(s, g)), limit(g) { }
+		void SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag);
+		leveldb::Status Write();
+		leveldb::Status Read();
+	};
+
+	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks, the blocks is [st, ed)
+		struct rr_addr st;
+		struct rr_addr ed;
 	};
 
 	//REQUIRE - bytes should be multiple of <chunk_size>.
@@ -65,19 +89,8 @@ private:
 		oc_options::AddrAllocPolicy policy;			//default: kRoundRobin_Fixed(an allocation will alloc the same chunks for each plane.)
 		bool bbt_cached;            				//default: enabled
 	};
-	struct rr_usage_meta {
-		LunAndPlane_t lap;
-		uint32_t block;
-		rr_usage_meta() : lap(0), block(0)
-		{
-		}
-		rr_usage_meta& operator=(const rr_usage_meta &r){
-			this->lap = r.lap;
-			this->block = r.block;
-			return *this;
-		}
-	};
-	
+
+
 
 	friend class ocssd;
 	friend class oc_GC;
@@ -89,12 +102,13 @@ private:
 	void FlushBBTs();
 	void Init();
 
-	void _add_blks(size_t blks);
+	void Add_blks(size_t blks);
+	void Set_stripe_blks_as(struct rr_addr st, struct rr_addr ed, BlkState_t flag);
 
 	oc_block_manager(ocssd *ssd);
 
 	/*
-	 * 
+	 * oc_block_manager factory function
 	 */
 	static leveldb::Status New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
 
@@ -103,10 +117,11 @@ private:
 	struct nvm_bbt **bbts_;
 	int bbts_length_;
 	int blks_length_;
+	leveldb::port::Mutex bbts_lock;
 
 
-	struct rr_usage_meta rr_u_meta_;
-	leveldb::port::Mutex mu_;
+	struct rr_addr next;
+	leveldb::port::Mutex next_lock;
 
 	struct Options opt_;
 	leveldb::Status s;

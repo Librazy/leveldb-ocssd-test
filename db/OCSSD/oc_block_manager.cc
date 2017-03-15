@@ -101,76 +101,203 @@ void oc_block_manager::TEST_Lap()
 
 void oc_block_manager::TEST_Pr_UM()
 {
-	printf("Blk%u,<L%uP%u>", rr_u_meta_.block, GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap));
+	printf("Blk%u,<L%uP%u>", next.block, GetLun(next.lap), GetPlane(next.lap));
 }
 
-void oc_block_manager::TEST_Add()
+bool oc_block_manager::rr_addr::ok(const struct nvm_geo *limit)
 {
-	size_t testcase[] = {6};
-	rr_usage_meta r0, r1;
-	r0.lap = MakeLunAndPlane(3,1);
-	r0.block = 0;
-	r1 = rr_u_meta_;
-	for (int i = 0; i < sizeof(testcase) / sizeof(testcase[0]); ++i) {
-		rr_u_meta_ = r0;
-		TEST_Pr_UM();
-		printf("+ %2zu = ", testcase[i]);
-		_add_blks(testcase[i]);
-		TEST_Pr_UM();
-		printf("\n");
+	bool ret = true;
+	uint32_t l = GetLun(this->lap);
+	uint32_t p = GetPlane(this->lap);
+	if (l >= limit->nluns || p >= limit->nplanes || this->block >= limit->nblocks) {
+		ret = false;
 	}
-	rr_u_meta_ = r1;
+	return ret;
 }
 
-void oc_block_manager::_add_blks(size_t blks)///TODO - [Lun - Plane - Block] addressing need to be refine!!!
+
+oc_block_manager::rr_addr& oc_block_manager::rr_addr::Increment(const struct nvm_geo *limit)
+{
+	uint32_t l = GetLun(this->lap), p = GetPlane(this->lap);
+	p++;
+	if (p >= limit->nplanes) {
+		l++;
+		p = 0;
+	}
+	if (l >= limit->nluns) {
+		this->block++;
+		l = 0;
+	}
+	this->lap = MakeLunAndPlane(l, p);
+	return *this;
+}
+
+oc_block_manager::rr_addr& oc_block_manager::rr_addr::Increment(size_t blks, const struct nvm_geo *limit)
 {
 	int itr = 0;
 	uint32_t l, p;
-	size_t left = _get_left_blks(rr_u_meta_.lap, geo_);
-	printf("\n %zu\n", left);
+	size_t left = _get_left_blks(this->lap, limit);
+//	printf("\n %zu\n", left);
 	while (1) {
 		if (blks < left) {
-			l = GetLun(rr_u_meta_.lap) + (blks / geo_->nplanes);
-			p = GetPlane(rr_u_meta_.lap) + (blks % geo_->nplanes);
-			while (p >= geo_->nplanes) {
-				p -= geo_->nplanes;
+			l = GetLun(this->lap) + (blks / limit->nplanes);
+			p = GetPlane(this->lap) + (blks % limit->nplanes);
+			while (p >= limit->nplanes) {
+				p -= limit->nplanes;
 				l++; 
 			}
-			printf(" %u, %u\n", l, p);
-			rr_u_meta_.lap = MakeLunAndPlane(l, p);
-			return;
+//			printf(" %u, %u\n", l, p);
+			this->lap = MakeLunAndPlane(l, p);
+			goto OUT;
 		} else {
 			assert(itr == 0); // at most go 1 time here.
-			rr_u_meta_.lap = 0;
-			rr_u_meta_.block++;
+			this->lap = 0;
+			this->block++;
 			blks -= left;
 			if (blks > 0) {
-				rr_u_meta_.block = rr_u_meta_.block + (blks / (geo_->nluns * geo_->nplanes));
-				left = geo_->nluns * geo_->nplanes;
-				blks = blks % (geo_->nluns * geo_->nplanes);
+				this->block = this->block + (blks / (limit->nluns * limit->nplanes));
+				left = limit->nluns * limit->nplanes;
+				blks = blks % (limit->nluns * limit->nplanes);
 			}
 			//a more round.
 		}
 		itr++;
 	}
+OUT:
+	return *this;
 }
+
+size_t oc_block_manager::rr_addr::Minus(const rr_addr& rhs, const struct nvm_geo *limit)
+{
+	size_t blks, blks_mi;
+	uint32_t l1 = GetLun(this->lap), p1 = GetPlane(this->lap), 
+		l2 = GetLun(rhs.lap), p2 = GetPlane(rhs.lap); 
+	if ((*this) <= rhs) {
+		return 0;
+	}
+
+	blks = (this->block - rhs.block) * (limit->nluns * limit->nplanes); 
+	blks += l1 * limit->nplanes;
+	blks += p1;
+
+	blks_mi = l2 * limit->nplanes;
+	blks_mi += p2;
+
+	return blks - blks_mi;
+}
+
+
+
+bool oc_block_manager::rr_addr::operator<=(const rr_addr& rhs)
+{
+	uint32_t l1 = GetLun(this->lap), p1 = GetPlane(this->lap),
+		l2 = GetLun(rhs.lap), p2 = GetPlane(rhs.lap);
+	if (this->block != rhs.block) {
+		return this->block < rhs.block;
+	} else if (l1 != l2) {
+		return l1 < l2;
+	} else if(p1 != p2){
+		return p1 < p2;
+	} else{
+		return true;
+	}
+}
+
+oc_block_manager::rr_addr& oc_block_manager::rr_addr::operator=(const rr_addr& rhs)
+{
+	this->lap = rhs.lap;
+	this->block = rhs.block;
+	return *this;
+}
+
+
+void oc_block_manager::TEST_Add()
+{
+	size_t testcase[] = {6};
+	rr_addr r0, r1; 
+	r0.lap = MakeLunAndPlane(3,1);
+	r0.block = 0;
+	r1 = next;
+	for (int i = 0; i < sizeof(testcase) / sizeof(testcase[0]); ++i) {
+		next = r0;
+		TEST_Pr_UM();
+		printf("+ %2zu = ", testcase[i]);
+		Add_blks(testcase[i]);
+		TEST_Pr_UM();
+		printf("\n");
+	}
+	next = r1;
+}
+
+void oc_block_manager::Add_blks(size_t blks)///TODO - [Block - Lun - Plane] addressing need to be refine!!!
+{
+	next.Increment(blks, geo_);
+}
+
+void oc_block_manager::Itr_rr_addr::SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag)
+{ 
+	uint32_t l, p;
+	while (blks) {
+		l = GetLun(st.lap);
+		p = GetPlane(st.lap);
+
+		bbts[_ch_lun2_bbt_idx(CH_THIS, l, limit)]->blks[_pl_blk2_bbtblks_idx(p, st.block, limit)] = flag;
+
+		st.Increment(limit); 
+		blks--;
+	}
+}
+
+leveldb::Status oc_block_manager::Itr_rr_addr::Write()
+{
+	leveldb::Status s;
+	return s;
+}
+leveldb::Status oc_block_manager::Itr_rr_addr::Read()
+{
+	leveldb::Status s;
+	return s;
+}
+
+
+/*
+ * Iterate on [st, ed) and set the corresponding slot in bbt.
+ */
+void oc_block_manager::Set_stripe_blks_as(struct rr_addr st, struct rr_addr ed, BlkState_t flag)
+{
+	{
+		leveldb::MutexLock l(&bbts_lock);
+		Itr_rr_addr itr(st, ed, geo_);
+		itr.SetBBTInCache(bbts_, flag);
+	}
+}
+
+
 
 leveldb::Status oc_block_manager::AllocStripe(size_t bytes, StripeDes *sd)
 {
 	assert(bytes % opt_.chunk_size == 0);
+	leveldb::Status s;
 	size_t blks = bytes / opt_.chunk_size;
-
-
+	sd->st = next;
+	{
+		leveldb::MutexLock l(&next_lock);
+		Add_blks(blks);
+	}
+	sd->ed = next;
+	return s;
 }
 
 leveldb::Status oc_block_manager::FreeStripe(StripeDes *sd)
 {
-
+	leveldb::Status s;
+	return s;
 }
 
 leveldb::Status oc_block_manager::FreeStripeArray(StripeDes *sds, int num)
 {
-
+	leveldb::Status s;
+	return s;
 }
 
 bool oc_block_manager::ok()
@@ -187,7 +314,7 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 		opt_.policy == oc_options::kRoundRobin_Fixed ? "RoundRobin_Fixed" : "Other",
 		opt_.chunk_size);
 	printf("BLKMNG Init Meta:\n");
-	printf("Next LAP: L %d, P %d\n" "Next Block: %u\n", GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap), rr_u_meta_.block); 
+	printf("Next LAP: <L%dP%d> Block:%u\n", GetLun(next.lap), GetPlane(next.lap), next.block); 
 }
 
 

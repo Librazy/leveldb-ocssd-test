@@ -1,6 +1,10 @@
 #include "ocssd.h"
 #include "oc_block_manager.h"
 
+int ocblkmng_stripe_test_rr_itr()
+{
+}
+
 int ocblkmng_stripe_test_add()
 {
 	leveldb::ocssd::ocssd ssd;

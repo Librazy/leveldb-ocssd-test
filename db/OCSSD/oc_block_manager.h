@@ -71,6 +71,7 @@ private:
 	void def_ocblk_opt(struct Options *opt);
 	void InitClean();
 	void InitBBTs();
+	void FlushBBTs();
 	void Init();
 
 	oc_block_manager(ocssd *ssd);
@@ -84,7 +85,7 @@ private:
 	const struct nvm_geo *const geo_;
 	struct nvm_bbt **bbts_;
 	int bbts_length_;
-
+	int blks_length_;
 
 
 	struct rr_usage_meta rr_u_meta_;

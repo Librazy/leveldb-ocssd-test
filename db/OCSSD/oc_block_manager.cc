@@ -22,7 +22,7 @@ const oc_block_manager::BlkState_t BLK_INVALID = NVM_BBT_GBAD;
 };
 
 /* 
- * Virtual BBT: 
+ * BBTs Layout:
  *  		  L0    L2   L3   L4
  *  		  p0p1  p0p1 p0p1 p0p1	    
  * B0   =     = =   = =  = =  = =
@@ -34,14 +34,14 @@ const oc_block_manager::BlkState_t BLK_INVALID = NVM_BBT_GBAD;
  * 			  BBT0  BBT1 BBT2 BBT3 
  */
 
-static inline int _idx_bbt()
+static inline int _ch_lun2_bbt_idx(int ch, int lun, const struct nvm_geo *geo)
 {
-
+	return ch * geo->nluns + lun;
 }
 
-static inline int _idx_blk()
+static inline int _pl_blk2_bbtblks_idx(int pl, int blk, const struct nvm_geo *geo)
 {
-
+	return blk * geo->nplanes + pl;
 }
 
 
@@ -111,14 +111,27 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 	nvm_addr_pr(rr_u_meta_.next_block);
 }
 
+
+
 leveldb::Status oc_block_manager::TEST_Pr_BBT()
 {
 	int i;
 	struct nvm_addr lun_addr;
 	struct nvm_ret ret;
-	const struct nvm_bbt *ptr;
-	for (i = 0; i < bbts_length_; i++) {
-		ptr = bbts_[i];
+	const struct nvm_bbt *ptr, *ptr2;
+
+	printf("BBTs: %p %p\n", bbts_, ssd_->dev_->bbts);
+
+
+	for (i = 0; i < geo_->nluns; i++) {
+		ptr = bbts_[_ch_lun2_bbt_idx(0, i, geo_)];
+		lun_addr.ppa = 0;
+		lun_addr.g.lun = i;
+		printf("before: %p\n", ssd_->dev_->bbts[_ch_lun2_bbt_idx(0, i, geo_)]);
+		if (ptr != (ptr2 = nvm_bbt_get(ssd_->dev_, lun_addr, &ret))) {
+			printf("Ptr!: %p, %p, %p\n", ptr, ssd_->dev_->bbts[_ch_lun2_bbt_idx(0, i, geo_)],ptr2);
+		}
+
 		TEST_My_nvm_bbt_pr(i, ptr);
 	}
 	return leveldb::Status::OK();
@@ -126,6 +139,8 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 BBT_ERR:
 	return leveldb::Status::IOError("Get BBT", strerror(errno));
 }
+
+//#define PRBBT_VERBOSE
 
 void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 {
@@ -142,8 +157,10 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 	printf("  nblks(%lu) {", bbt->nblks);
 	for (int i = 0; i < bbt->nblks; i += bbt->dev->geo.nplanes) {
 		int blk = i / bbt->dev->geo.nplanes;
+#ifdef PRBBT_VERBOSE
 		if (pred < Pr_num /*first Pr_num ones*/
 			|| i == bbt->nblks - bbt->dev->geo.nplanes/*last one*/) {
+#endif
 			printf("\n    blk(%04d): [ ", blk);
 			for (int blk = i; blk < (i + bbt->dev->geo.nplanes); ++blk) {
 				my_nvm_bbt_state_pr(bbt->blks[blk]);
@@ -154,10 +171,12 @@ void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 			}
 			printf("]");
 			pred++;
+#ifdef PRBBT_VERBOSE
 		} else if (!pr_sr) {
 			printf("\n....");
 			pr_sr = 1;
 		}
+#endif
 	}
 	printf("\n  }\n");
 	printf("  #notfree(%d)\n", nnotfree);
@@ -178,8 +197,10 @@ void oc_block_manager::def_ocblk_opt(struct Options *opt)
  */
 void oc_block_manager::InitClean()
 {
+	int i;
+	struct nvm_bbt *ptr;
 	//Erase
-	for (int i = 0; i < geo_->nluns; ++i) {
+	for (i = 0; i < geo_->nluns; ++i) {
 		printf("oc_block_manager::InitClean, Lun %d\n", i);
 		s = oc_GC::EraseByLun(0, i, this);
 	}
@@ -187,8 +208,18 @@ void oc_block_manager::InitClean()
 		goto OUT;
 	}
 
-	//Set BBTs
-
+	//Set BBTs as all free.
+	for (i = 0; i < bbts_length_; ++i) {
+		ptr = bbts_[i];
+		assert(ptr);//ptr should not be null.
+		for (int j = 0; j < blks_length_; ++j) {
+			ptr->blks[j] = BLK_UNUSED;
+		}
+	}
+//	FlushBBTs();  
+	if (!s.ok()) {
+		goto OUT;
+	}
 
 OUT:
 	return;
@@ -222,12 +253,22 @@ void oc_block_manager::InitBBTs()
 		}
 		bbts_ = ssd_->dev_->bbts;
 		bbts_length_ = geo_->nchannels * geo_->nluns; //sum of the LUNs.
+		blks_length_ = geo_->nplanes * geo_->nblocks; //sum of the blks inside a LUNs.
 	}
 	return; //ok, then we can maintan the bbts now.
 
 BBT_ERR:
 	s = leveldb::Status::IOError("oc_blk_mng: get bbts", strerror(errno));
 }
+
+void oc_block_manager::FlushBBTs() ///WARNING - Flush the BBT will cause it free the bbt entry.
+{
+	struct nvm_ret ret;
+	if (nvm_bbt_flush_all(ssd_->dev_, &ret)) {
+		s = leveldb::Status::IOError("oc_blk_mng: flush bbts", strerror(errno));
+	}
+}
+
 
 void oc_block_manager::Init()
 {

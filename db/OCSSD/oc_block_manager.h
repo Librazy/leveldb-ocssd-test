@@ -50,6 +50,7 @@ public:
 	leveldb::Status TEST_Pr_BBT();
 	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt);
 	void TEST_Lap();
+	void TEST_Add();
 
 
 	

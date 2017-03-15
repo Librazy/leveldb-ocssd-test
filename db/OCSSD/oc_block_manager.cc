@@ -99,9 +99,37 @@ void oc_block_manager::TEST_Lap()
 	}
 }
 
+void oc_block_manager::TEST_Add()
+{
+	size_t testcase[] = {5, 8, 30};
+
+}
+
 void oc_block_manager::_add_blks(size_t blks)
 {
-	size_t left = rr_u_meta_.lap;
+	int itr = 0;
+	uint32_t l, p;
+	size_t left = _get_left_blks(rr_u_meta_.lap, geo_);
+	while (1) {
+		if (blks < left) {
+			l = GetLun(rr_u_meta_.lap) + (blks / geo_->nplanes);
+			p = GetPlane(rr_u_meta_.lap) + (blks % geo_->nplanes);
+			rr_u_meta_.lap = MakeLunAndPlane(l, p);
+			return;
+		} else {
+			assert(itr == 0); // at most go 1 time here.
+			rr_u_meta_.lap = 0;
+			rr_u_meta_.block++;
+			blks -= left;
+			if (blks > 0) {
+				rr_u_meta_.block = rr_u_meta_.block + (blks / (geo_->nluns * geo_->nplanes));
+				left = geo_->nluns * geo_->nplanes;
+				blks = blks % (geo_->nluns * geo_->nplanes);
+			}
+			//a more round.
+		}
+		itr++;
+	}
 }
 
 leveldb::Status oc_block_manager::AllocStripe(size_t bytes, StripeDes *sd)

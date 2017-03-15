@@ -59,6 +59,8 @@ public:
 	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks, the blocks is [st, ed)
 		struct rr_addr st;
 		struct rr_addr ed;
+		StripeDes() : st(0), ed(0){ }
+		StripeDes(struct rr_addr s, struct rr_addr e) : st(s), ed(e){ }
 	};
 
 	//REQUIRE - bytes should be multiple of <chunk_size>.
@@ -103,7 +105,7 @@ private:
 	void Init();
 
 	void Add_blks(size_t blks);
-	void Set_stripe_blks_as(struct rr_addr st, struct rr_addr ed, BlkState_t flag);
+	void Set_stripe_blks_as(struct StripeDes des, BlkState_t flag);
 
 	oc_block_manager(ocssd *ssd);
 

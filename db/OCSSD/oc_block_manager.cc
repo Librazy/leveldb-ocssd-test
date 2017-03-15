@@ -263,11 +263,11 @@ leveldb::Status oc_block_manager::Itr_rr_addr::Read()
 /*
  * Iterate on [st, ed) and set the corresponding slot in bbt.
  */
-void oc_block_manager::Set_stripe_blks_as(struct rr_addr st, struct rr_addr ed, BlkState_t flag)
+void oc_block_manager::Set_stripe_blks_as(struct StripeDes des, BlkState_t flag)
 {
 	{
 		leveldb::MutexLock l(&bbts_lock);
-		Itr_rr_addr itr(st, ed, geo_);
+		Itr_rr_addr itr(des.st, des.ed, geo_);
 		itr.SetBBTInCache(bbts_, flag);
 	}
 }
@@ -285,18 +285,29 @@ leveldb::Status oc_block_manager::AllocStripe(size_t bytes, StripeDes *sd)
 		Add_blks(blks);
 	}
 	sd->ed = next;
+
+	Set_stripe_blks_as(*sd, BLK_USED);
+
 	return s;
 }
 
 leveldb::Status oc_block_manager::FreeStripe(StripeDes *sd)
 {
 	leveldb::Status s;
+
+	Set_stripe_blks_as(*sd, BLK_INVALID); 
+
 	return s;
 }
 
 leveldb::Status oc_block_manager::FreeStripeArray(StripeDes *sds, int num)
 {
 	leveldb::Status s;
+
+	for (int i = 0; i < num; i++) {
+		Set_stripe_blks_as(sds[i], BLK_INVALID); 
+	}
+
 	return s;
 }
 

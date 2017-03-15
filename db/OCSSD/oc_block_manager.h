@@ -51,9 +51,9 @@ public:
 		struct rr_addr ed;
 		const struct nvm_geo *limit;
 		Itr_rr_addr(struct rr_addr s, struct rr_addr e, const struct nvm_geo *g): st(s), ed(e), blks(e.Minus(s, g)), limit(g) { }
-		void SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag);
-		leveldb::Status Write();
-		leveldb::Status Read();
+		void SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag); 	//Increment by 1(Memory Operation)
+		leveldb::Status Write();										//Increment by stripe(partial stripe)
+		leveldb::Status Read();											//Increment by stripe(partial stripe)
 	};
 
 	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks, the blocks is [st, ed)

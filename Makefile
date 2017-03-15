@@ -411,6 +411,8 @@ $(STATIC_OUTDIR)/ocssd_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_test.o $(STATIC_LIB
 $(STATIC_OUTDIR)/ocssd_oc_blk_mng_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_oc_blk_mng_test.o $(STATIC_LIBOBJECTS)
 	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/OCSSD/ocssd_oc_blk_mng_test.cc $(STATIC_LIBOBJECTS) -o $@ $(LIBS)
 
+.PHONY: OCSSD_TEST
+OCSSD_TEST: $(STATIC_OUTDIR)/ocssd_test $(STATIC_OUTDIR)/ocssd_oc_blk_mng_test
 
 .PHONY: run-shared
 run-shared: $(SHARED_OUTDIR)/db_bench

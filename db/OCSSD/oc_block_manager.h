@@ -51,7 +51,7 @@ public:
 	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt);
 	void TEST_Lap();
 	void TEST_Add();
-
+	void TEST_Pr_UM();
 
 	
 private:
@@ -67,10 +67,14 @@ private:
 	};
 	struct rr_usage_meta {
 		LunAndPlane_t lap;
-		struct nvm_addr block;
-		rr_usage_meta() : lap(0)
+		uint32_t block;
+		rr_usage_meta() : lap(0), block(0)
 		{
-			block.ppa = 0;
+		}
+		rr_usage_meta& operator=(const rr_usage_meta &r){
+			this->lap = r.lap;
+			this->block = r.block;
+			return *this;
 		}
 	};
 	

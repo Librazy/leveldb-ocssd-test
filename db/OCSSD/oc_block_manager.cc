@@ -70,19 +70,19 @@ static void my_nvm_bbt_state_pr(int state)
 
 
 //REQUIRE: Lun and Pl's value should be less then 16-length
-#define MakeLunAndPlane(Lun, Pl) ({ \
-			uint32_t l = Lun;       \
-			uint32_t p = Pl;        \
-			uint32_t lap = (l << 16) | p; \
-			lap; \
+#define MakeLunAndPlane(__LUN, __PL) ({ \
+			uint32_t __l = __LUN;       \
+			uint32_t __p = __PL;        \
+			uint32_t __lap = (__l << 16) | __p; \
+			__lap; \
 			})
 
-#define GetLun(lap) ({ uint32_t mask = ((uint32_t)1 << 16) - 1; \
-			(lap & (mask << 16)) >> 16; \
+#define GetLun(__LAP) ({ uint32_t __mask = ((uint32_t)1 << 16) - 1; \
+			(__LAP & (__mask << 16)) >> 16; \
 			})
 
-#define GetPlane(lap) ({ uint32_t mask = ((uint32_t)1 << 16) - 1; \
-			lap & mask; \
+#define GetPlane(__LAP) ({ uint32_t __mask = ((uint32_t)1 << 16) - 1; \
+			__LAP & __mask; \
 			})
 
 static inline size_t _get_left_blks(oc_block_manager::LunAndPlane_t lap,const struct nvm_geo *geo)
@@ -99,21 +99,44 @@ void oc_block_manager::TEST_Lap()
 	}
 }
 
-void oc_block_manager::TEST_Add()
+void oc_block_manager::TEST_Pr_UM()
 {
-	size_t testcase[] = {5, 8, 30};
-
+	printf("Blk%u,<L%uP%u>", rr_u_meta_.block, GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap));
 }
 
-void oc_block_manager::_add_blks(size_t blks)
+void oc_block_manager::TEST_Add()
+{
+	size_t testcase[] = {6};
+	rr_usage_meta r0, r1;
+	r0.lap = MakeLunAndPlane(3,1);
+	r0.block = 0;
+	r1 = rr_u_meta_;
+	for (int i = 0; i < sizeof(testcase) / sizeof(testcase[0]); ++i) {
+		rr_u_meta_ = r0;
+		TEST_Pr_UM();
+		printf("+ %2zu = ", testcase[i]);
+		_add_blks(testcase[i]);
+		TEST_Pr_UM();
+		printf("\n");
+	}
+	rr_u_meta_ = r1;
+}
+
+void oc_block_manager::_add_blks(size_t blks)///TODO - [Lun - Plane - Block] addressing need to be refine!!!
 {
 	int itr = 0;
 	uint32_t l, p;
 	size_t left = _get_left_blks(rr_u_meta_.lap, geo_);
+	printf("\n %zu\n", left);
 	while (1) {
 		if (blks < left) {
 			l = GetLun(rr_u_meta_.lap) + (blks / geo_->nplanes);
 			p = GetPlane(rr_u_meta_.lap) + (blks % geo_->nplanes);
+			while (p >= geo_->nplanes) {
+				p -= geo_->nplanes;
+				l++; 
+			}
+			printf(" %u, %u\n", l, p);
 			rr_u_meta_.lap = MakeLunAndPlane(l, p);
 			return;
 		} else {
@@ -164,8 +187,7 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 		opt_.policy == oc_options::kRoundRobin_Fixed ? "RoundRobin_Fixed" : "Other",
 		opt_.chunk_size);
 	printf("BLKMNG Init Meta:\n");
-	printf("Next LAP: L %d, P %d\n" "Next Block:\n", GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap)); 
-	nvm_addr_pr(rr_u_meta_.block);
+	printf("Next LAP: L %d, P %d\n" "Next Block: %u\n", GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap), rr_u_meta_.block); 
 }
 
 

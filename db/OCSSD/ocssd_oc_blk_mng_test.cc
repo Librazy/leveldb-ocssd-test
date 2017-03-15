@@ -44,6 +44,6 @@ int ocblkmng_construct_test()
 
 int main()
 {
-	ocblkmng_stripe_test_lap();
+	ocblkmng_stripe_test_add();
 	return 0;
 }

@@ -1,7 +1,7 @@
 #ifndef YWJ_OCSSD_H
 #define YWJ_OCSSD_H
 #include <string>
-//DB Headers
+//DB headers
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
 #include "db/version_edit.h"
@@ -9,7 +9,7 @@
 #include "port/port.h"
 #include "port/thread_annotations.h"
 
-//liblightnvm Headers
+//liblightnvm headers
 #include "liblightnvm.h"
 #include "nvm.h"
 

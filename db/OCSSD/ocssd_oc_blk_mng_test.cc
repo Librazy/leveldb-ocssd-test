@@ -1,7 +1,19 @@
 #include "ocssd.h"
 #include "oc_block_manager.h"
 
-int ocblkmng()
+int ocblkmng_stripe_test_lap()
+{
+	leveldb::ocssd::ocssd ssd;
+	if (ssd.ok()) {
+		printf("ocssd construct ok.\n");
+	}else{
+		printf("ocssd construct failed: %s.\n", ssd.s.ToString().c_str()); 
+	}
+	ssd.TEST_Get_BLK_MNG()->TEST_Lap(); 
+	return 0;
+}
+
+int ocblkmng_construct_test()
 {
 	leveldb::ocssd::ocssd ssd;
 	if (ssd.ok()) {
@@ -19,6 +31,6 @@ int ocblkmng()
 
 int main()
 {
-	ocblkmng();
+	ocblkmng_stripe_test_lap();
 	return 0;
 }

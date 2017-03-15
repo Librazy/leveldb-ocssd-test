@@ -1,4 +1,7 @@
 #include "oc_block_manager.h"
+
+#include "util/mutexlock.h"
+
 #include <cassert>
 
 namespace leveldb {
@@ -9,7 +12,7 @@ namespace {
 const oc_block_manager::BlkState_t BLK_UNUSED = NVM_BBT_FREE; 
 const oc_block_manager::BlkState_t BLK_USED = NVM_BBT_HMRK;
 const oc_block_manager::BlkState_t BLK_INVALID = NVM_BBT_GBAD;
-
+const int CH_THIS = 0;	//Qemu OCSSD is only 1 channel
 /* 
  * The flags transition 
  *  
@@ -45,6 +48,8 @@ static inline int _pl_blk2_bbtblks_idx(int pl, int blk, const struct nvm_geo *ge
 }
 
 
+
+
 static void my_nvm_bbt_state_pr(int state)
 {
 	switch (state) {
@@ -64,7 +69,7 @@ static void my_nvm_bbt_state_pr(int state)
 }
 
 
-//REQUIRE: Lun and Pl's type should be 32-length
+//REQUIRE: Lun and Pl's value should be less then 16-length
 #define MakeLunAndPlane(Lun, Pl) ({ \
 			uint32_t l = Lun;       \
 			uint32_t p = Pl;        \
@@ -80,19 +85,43 @@ static void my_nvm_bbt_state_pr(int state)
 			lap & mask; \
 			})
 
-
-/*
- * @approximate_size - how many bytes to alloc(approximately)
- */
-leveldb::Status oc_block_manager::AllocBlocks(size_t approximate_size, oc_block_manager::AllocBlkDes *abd)
+static inline size_t _get_left_blks(oc_block_manager::LunAndPlane_t lap,const struct nvm_geo *geo)
 {
-	return leveldb::Status::OK();
+	return ((geo->nluns - GetLun(lap)) * geo->nplanes) - GetPlane(lap); 
 }
 
-leveldb::Status oc_block_manager::FreeBlocks(oc_block_manager::AllocBlkDes *blks)
+void oc_block_manager::TEST_Lap()
 {
-	return leveldb::Status::OK();
+	for (int i; i < geo_->nluns; i++) {
+		for (int j = 0; j < geo_->nplanes; j++) {
+			printf("<L%dP%d> %zu\n", i, j, _get_left_blks(MakeLunAndPlane(i, j), geo_));
+		}
+	}
 }
+
+void oc_block_manager::_add_blks(size_t blks)
+{
+	size_t left = rr_u_meta_.lap;
+}
+
+leveldb::Status oc_block_manager::AllocStripe(size_t bytes, StripeDes *sd)
+{
+	assert(bytes % opt_.chunk_size == 0);
+	size_t blks = bytes / opt_.chunk_size;
+
+
+}
+
+leveldb::Status oc_block_manager::FreeStripe(StripeDes *sd)
+{
+
+}
+
+leveldb::Status oc_block_manager::FreeStripeArray(StripeDes *sds, int num)
+{
+
+}
+
 bool oc_block_manager::ok()
 {
 	return s.ok();
@@ -107,8 +136,8 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 		opt_.policy == oc_options::kRoundRobin_Fixed ? "RoundRobin_Fixed" : "Other",
 		opt_.chunk_size);
 	printf("BLKMNG Init Meta:\n");
-	printf("Next LAP: L %d, P %d\n" "Next Block:\n", GetLun(rr_u_meta_.next_lap), GetPlane(rr_u_meta_.next_lap));
-	nvm_addr_pr(rr_u_meta_.next_block);
+	printf("Next LAP: L %d, P %d\n" "Next Block:\n", GetLun(rr_u_meta_.lap), GetPlane(rr_u_meta_.lap)); 
+	nvm_addr_pr(rr_u_meta_.block);
 }
 
 
@@ -120,17 +149,17 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 	struct nvm_ret ret;
 	const struct nvm_bbt *ptr, *ptr2;
 
-	printf("BBTs: %p %p\n", bbts_, ssd_->dev_->bbts);
+//	printf("BBTs: %p %p\n", bbts_, ssd_->dev_->bbts);
 
 
 	for (i = 0; i < geo_->nluns; i++) {
-		ptr = bbts_[_ch_lun2_bbt_idx(0, i, geo_)];
+		ptr = bbts_[_ch_lun2_bbt_idx(CH_THIS, i, geo_)];
 		lun_addr.ppa = 0;
 		lun_addr.g.lun = i;
-		printf("before: %p\n", ssd_->dev_->bbts[_ch_lun2_bbt_idx(0, i, geo_)]);
-		if (ptr != (ptr2 = nvm_bbt_get(ssd_->dev_, lun_addr, &ret))) {
-			printf("Ptr!: %p, %p, %p\n", ptr, ssd_->dev_->bbts[_ch_lun2_bbt_idx(0, i, geo_)],ptr2);
-		}
+//		printf("before: %p\n", ssd_->dev_->bbts[_ch_lun2_bbt_idx(CH_THIS, i, geo_)]);
+//		if (ptr != (ptr2 = nvm_bbt_get(ssd_->dev_, lun_addr, &ret))) {
+//			printf("Ptr!: %p, %p, %p\n", ptr, ssd_->dev_->bbts[_ch_lun2_bbt_idx(CH_THIS, i, geo_)],ptr2);
+//		}
 
 		TEST_My_nvm_bbt_pr(i, ptr);
 	}
@@ -140,7 +169,7 @@ BBT_ERR:
 	return leveldb::Status::IOError("Get BBT", strerror(errno));
 }
 
-//#define PRBBT_VERBOSE
+#define PRBBT_VERBOSE
 
 void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
 {
@@ -201,8 +230,8 @@ void oc_block_manager::InitClean()
 	struct nvm_bbt *ptr;
 	//Erase
 	for (i = 0; i < geo_->nluns; ++i) {
-		printf("oc_block_manager::InitClean, Lun %d\n", i);
-		s = oc_GC::EraseByLun(0, i, this);
+	//	printf("oc_block_manager::InitClean, Lun %d\n", i);
+		s = oc_GC::EraseByLun(CH_THIS, i, this); 
 	}
 	if (!s.ok()) {
 		goto OUT;
@@ -215,10 +244,6 @@ void oc_block_manager::InitClean()
 		for (int j = 0; j < blks_length_; ++j) {
 			ptr->blks[j] = BLK_UNUSED;
 		}
-	}
-//	FlushBBTs();  
-	if (!s.ok()) {
-		goto OUT;
 	}
 
 OUT:

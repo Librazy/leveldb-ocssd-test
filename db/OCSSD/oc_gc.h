@@ -5,7 +5,7 @@
 
 #include "oc_block_manager.h"
 
-//liblightnvm Headers
+//liblightnvm headers
 #include "liblightnvm.h"
 #include "nvm.h"
 

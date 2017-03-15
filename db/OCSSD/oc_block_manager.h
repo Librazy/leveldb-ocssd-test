@@ -5,8 +5,11 @@
 #include "oc_options.h"
 #include "oc_gc.h"
 
+//mutex & condition varieble headers
+#include "port/port.h"
 
-//liblightnvm Headers
+
+//liblightnvm headers
 #include "liblightnvm.h"
 #include "nvm.h"
 
@@ -28,22 +31,28 @@ public:
 	typedef uint32_t LunAndPlane_t;
 	typedef uint8_t BlkState_t;
 
-	struct AllocBlkDes {
+	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks
+		LunAndPlane_t st;
+		LunAndPlane_t ed;
+		int blk_num_st;
 	};
 
+	//REQUIRE - bytes should be multiple of <chunk_size>.
+	leveldb::Status AllocStripe(size_t bytes, StripeDes *sd);
+	leveldb::Status FreeStripe(StripeDes *sd);
+	leveldb::Status FreeStripeArray(StripeDes *sds, int num);
 
-	/*
-	 * @approximate_size - how many bytes to alloc(approximately)
-	 */
-	leveldb::Status AllocBlocks(size_t approximate_size, AllocBlkDes *abd);
-
-	leveldb::Status FreeBlocks(AllocBlkDes *blks);
 
 	bool ok();
 
+	//TESTS
 	void TEST_Pr_Opt_Meta();
 	leveldb::Status TEST_Pr_BBT();
 	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt);
+	void TEST_Lap();
+
+
+	
 private:
 	/*  Problems to be issued:
 	 *  1. a file can be discontinuous in lun : (a file's size is changable at any time: support Append as a FS?)
@@ -56,11 +65,11 @@ private:
 		bool bbt_cached;            				//default: enabled
 	};
 	struct rr_usage_meta {
-		LunAndPlane_t next_lap;
-		struct nvm_addr next_block;
-		rr_usage_meta() : next_lap(0)
+		LunAndPlane_t lap;
+		struct nvm_addr block;
+		rr_usage_meta() : lap(0)
 		{
-			next_block.ppa = 0;
+			block.ppa = 0;
 		}
 	};
 	
@@ -69,10 +78,13 @@ private:
 	friend class oc_GC;
 
 	void def_ocblk_opt(struct Options *opt);
+
 	void InitClean();
 	void InitBBTs();
 	void FlushBBTs();
 	void Init();
+
+	void _add_blks(size_t blks);
 
 	oc_block_manager(ocssd *ssd);
 
@@ -89,6 +101,8 @@ private:
 
 
 	struct rr_usage_meta rr_u_meta_;
+	leveldb::port::Mutex mu_;
+
 	struct Options opt_;
 	leveldb::Status s;
 };

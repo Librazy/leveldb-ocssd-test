@@ -1,6 +1,7 @@
+#include "oc_file.h"
 #include "oc_ssd.h"
 
-int construct()
+int oc_file_nodelist_test()
 {
 	leveldb::ocssd::oc_ssd ssd;
 	if (ssd.ok()) {
@@ -8,11 +9,13 @@ int construct()
 	}else{
 		printf("ocssd construct failed: %s.\n", ssd.s.ToString().c_str()); 
 	}
+	leveldb::ocssd::oc_file* f = ssd.TEST_New_file("1.txt");
+	f->TEST_NodeList();
 	return 0;
 }
 
 int main()
 {
-	construct();
+	oc_file_nodelist_test();
 	return 0;
 }

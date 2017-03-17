@@ -1,3 +1,5 @@
+#include "oc_ssd.h"
+#include "oc_block_manager.h"
 #include "oc_gc.h"
 
 

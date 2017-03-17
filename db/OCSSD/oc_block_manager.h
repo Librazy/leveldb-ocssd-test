@@ -1,7 +1,6 @@
 #ifndef YWJ_OCSSD_OC_BLK_MNG_H
 #define YWJ_OCSSD_OC_BLK_MNG_H
 
-#include "ocssd.h"
 #include "oc_options.h"
 #include "oc_gc.h"
 
@@ -21,7 +20,7 @@
 namespace leveldb {
 namespace ocssd {
 
-class ocssd;
+class oc_ssd;
 class oc_GC;
 
 class oc_block_manager { //allocation is done in a granularity of <Block>
@@ -108,7 +107,8 @@ private:
 
 
 
-	friend class ocssd;
+	friend class oc_ssd;
+	friend class oc_file;
 	friend class oc_GC;
 
 	void def_ocblk_opt(struct Options *opt);
@@ -121,14 +121,14 @@ private:
 	void Add_blks(size_t blks);
 	void Set_stripe_blks_as(struct StripeDes des, BlkState_t flag);
 
-	oc_block_manager(ocssd *ssd);
+	oc_block_manager(oc_ssd *ssd);
 
 	/*
 	 * oc_block_manager factory function
 	 */
-	static leveldb::Status New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
+	static leveldb::Status New_oc_block_manager(oc_ssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
 
-	ocssd *const ssd_;
+	oc_ssd *const ssd_;
 	const struct nvm_geo *const geo_;
 	struct nvm_bbt **bbts_;
 	int bbts_length_;

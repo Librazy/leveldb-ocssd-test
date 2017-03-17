@@ -1,5 +1,5 @@
 //OCSSD-Optimization Modules headers
-#include "ocssd.h"
+#include "oc_ssd.h"
 #include "oc_block_manager.h"
 
 
@@ -38,19 +38,19 @@ static bool pmode_is_good(int pmode)
 }
 
 
-ocssd::ocssd() : des_(new ocssd_descriptor(oc_options::kDevPath)), dev_(NULL)
+oc_ssd::oc_ssd() : des_(new oc_ssd_descriptor(oc_options::kDevPath)), dev_(NULL)
 {
 	Setup();
 	if (s.ok()) {
 		s = oc_block_manager::New_oc_block_manager(this, &blkmng_);
 	}
 }
-ocssd::~ocssd()
+oc_ssd::~oc_ssd()
 {
 	Cleanup();
 }
 
-void ocssd::Setup()
+void oc_ssd::Setup()
 {
 	//Open device
 	dev_ = nvm_dev_open(des_->dev_path_.c_str());
@@ -66,25 +66,30 @@ void ocssd::Setup()
 	}
 
 }
-void ocssd::Cleanup()
+void oc_ssd::Cleanup()
 {
 	nvm_dev_close(dev_);
 	delete des_;
 }
 
-leveldb::Status NewOCFile(oc_file **ret)
-{
-}
 
-void ocssd::EncodeTo(struct ocssd_descriptor *ocdes, char *buf)
+void oc_ssd::EncodeTo(struct oc_ssd_descriptor *ocdes, char *buf)
 {
 	std::string str;
 	PutLengthPrefixedSlice(&str, ocdes->dev_path_);
 	size_t num = ocdes->files_.size();
 }
-void ocssd::DecodeFrom(struct ocssd_descriptor *ocdes, char *buf)
+void oc_ssd::DecodeFrom(struct oc_ssd_descriptor *ocdes, char *buf)
 {
 
+}
+
+
+oc_file* oc_ssd::TEST_New_file(const char *fname)
+{
+	oc_file *ptr;
+	leveldb::Status s = oc_file::New_oc_file(this, fname, &ptr);
+	return ptr;
 }
 
 

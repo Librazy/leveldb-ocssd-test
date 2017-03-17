@@ -36,6 +36,7 @@ TESTS = \
 	db/write_batch_test \
 	db/OCSSD/ocssd_test \
 	db/OCSSD/ocssd_oc_blk_mng_test \
+	db/OCSSD/ocssd_oc_file_test \
 	helpers/memenv/memenv_test \
 	issues/issue178_test \
 	issues/issue200_test \
@@ -411,8 +412,11 @@ $(STATIC_OUTDIR)/ocssd_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_test.o $(STATIC_LIB
 $(STATIC_OUTDIR)/ocssd_oc_blk_mng_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_oc_blk_mng_test.o $(STATIC_LIBOBJECTS)
 	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/OCSSD/ocssd_oc_blk_mng_test.cc $(STATIC_LIBOBJECTS) -o $@ $(LIBS)
 
+$(STATIC_OUTDIR)/ocssd_oc_file_test: $(STATIC_OUTDIR)/db/OCSSD/ocssd_oc_file_test.o $(STATIC_LIBOBJECTS)
+	$(CXX) $(LDFLAGS) $(CXXFLAGS) db/OCSSD/ocssd_oc_file_test.cc $(STATIC_LIBOBJECTS) -o $@ $(LIBS)
+
 .PHONY: OCSSD_TEST
-OCSSD_TEST: $(STATIC_OUTDIR)/ocssd_test $(STATIC_OUTDIR)/ocssd_oc_blk_mng_test
+OCSSD_TEST: $(STATIC_OUTDIR)/ocssd_test $(STATIC_OUTDIR)/ocssd_oc_blk_mng_test $(STATIC_OUTDIR)/ocssd_oc_file_test
 
 .PHONY: run-shared
 run-shared: $(SHARED_OUTDIR)/db_bench

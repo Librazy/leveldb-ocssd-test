@@ -1,9 +1,9 @@
-#include "ocssd.h"
+#include "oc_ssd.h"
 #include "oc_block_manager.h"
 int ocblkmng_stripe_test_allocstripe()
 {
 	leveldb::ocssd::oc_block_manager::StripeDes sd;
-	leveldb::ocssd::ocssd ssd;
+	leveldb::ocssd::oc_ssd ssd;
 	
 	if (ssd.ok()) {
 		printf("ocssd construct ok.\n");
@@ -45,7 +45,7 @@ int ocblkmng_stripe_test_allocstripe()
 
 int ocblkmng_stripe_test_rr_itr()
 {
-	leveldb::ocssd::ocssd ssd;
+	leveldb::ocssd::oc_ssd ssd;
 	if (ssd.ok()) {
 		printf("ocssd construct ok.\n");
 	}else{
@@ -57,7 +57,7 @@ int ocblkmng_stripe_test_rr_itr()
 
 int ocblkmng_stripe_test_add()
 {
-	leveldb::ocssd::ocssd ssd;
+	leveldb::ocssd::oc_ssd ssd;
 	if (ssd.ok()) {
 		printf("ocssd construct ok.\n");
 	}else{
@@ -70,7 +70,7 @@ int ocblkmng_stripe_test_add()
 
 int ocblkmng_stripe_test_lap()
 {
-	leveldb::ocssd::ocssd ssd;
+	leveldb::ocssd::oc_ssd ssd;
 	if (ssd.ok()) {
 		printf("ocssd construct ok.\n");
 	}else{
@@ -82,7 +82,7 @@ int ocblkmng_stripe_test_lap()
 
 int ocblkmng_construct_test()
 {
-	leveldb::ocssd::ocssd ssd;
+	leveldb::ocssd::oc_ssd ssd;
 	if (ssd.ok()) {
 		printf("ocssd construct ok.\n");
 	}else{

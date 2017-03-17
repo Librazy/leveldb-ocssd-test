@@ -23,7 +23,7 @@ extern const char *kOCSSDMetaFileNameSuffix;
 extern const ChunkingAlgor kChunkingAlgor;
 extern const GCPolicy kGCPolicy;
 extern const AddrAllocPolicy kAddrAllocPolicy;
-
+extern const int kOCFileNodeDegree;
 }
 
 }//namespace ocssd

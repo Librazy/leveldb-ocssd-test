@@ -52,14 +52,17 @@ public:
 		const struct nvm_geo *limit;
 		Itr_rr_addr(struct rr_addr s, struct rr_addr e, const struct nvm_geo *g): st(s), ed(e), blks(e.Minus(s, g)), limit(g) { }
 		void SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag); 	//Increment by 1(Memory Operation)
+		
+
 		leveldb::Status Write();										//Increment by stripe(partial stripe)
 		leveldb::Status Read();											//Increment by stripe(partial stripe)
+		void TEST_Iteration();											//For Unit TEST
 	};
 
 	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks, the blocks is [st, ed)
 		struct rr_addr st;
 		struct rr_addr ed;
-		StripeDes() : st(0), ed(0){ }
+		StripeDes() : st(), ed(){ }
 		StripeDes(struct rr_addr s, struct rr_addr e) : st(s), ed(e){ }
 	};
 
@@ -70,16 +73,27 @@ public:
 
 
 	bool ok();
+	void Pr_BlocksState(const char *fname = 0);
+
 
 	//TESTS
 	void TEST_Pr_Opt_Meta();
 	leveldb::Status TEST_Pr_BBT();
-	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt);
+	
+
 	void TEST_Lap();
 	void TEST_Add();
-	void TEST_Pr_UM();
+	void TEST_Pr_UM();	
+	void TEST_Itr_rr_addr();
 
-	
+	size_t TEST_Get_ChunkSize()
+	{
+		return opt_.chunk_size;
+	}
+
+	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt, const char *fname = 0);
+	static void TEST_RR_Addr_Pr(struct rr_addr x); 
+
 private:
 	/*  Problems to be issued:
 	 *  1. a file can be discontinuous in lun : (a file's size is changable at any time: support Append as a FS?)

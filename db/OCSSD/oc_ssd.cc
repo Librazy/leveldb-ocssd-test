@@ -1,6 +1,7 @@
 //OCSSD-Optimization Modules headers
 #include "oc_ssd.h"
 #include "oc_block_manager.h"
+#include "oc_page_cache.h"
 
 
 #include "util/coding.h"
@@ -65,10 +66,14 @@ void oc_ssd::Setup()
 		s = Status::IOError("OCSSD get pmode error");
 	}
 
+	page_pool_ = new oc_page_pool(dev_);
 }
 void oc_ssd::Cleanup()
 {
 	nvm_dev_close(dev_);
+
+	delete page_pool_;
+
 	delete des_;
 }
 

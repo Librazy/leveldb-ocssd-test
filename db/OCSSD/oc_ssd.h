@@ -24,6 +24,7 @@ namespace ocssd {
 class oc_file;
 class oc_block_manager;
 class oc_GC;
+class oc_page_pool;
 
 class oc_ssd {  //an ocssd device
 public:
@@ -45,6 +46,16 @@ public:
 		}
 	};
 
+
+	inline const struct nvm_geo *Geo()
+	{
+		return nvm_dev_get_geo(dev_);
+	}
+
+	inline oc_block_manager* Blkmng()
+	{
+		return blkmng_;
+	}
 	//TESTS
 	oc_block_manager* TEST_Get_BLK_MNG()
 	{
@@ -58,14 +69,13 @@ public:
 
 private:
 	friend class oc_block_manager;
-	friend class oc_file;
 	friend class oc_GC;
 
 	struct nvm_dev *dev_;
 	int pmode_;
 	struct oc_ssd_descriptor *des_;
 	oc_block_manager *blkmng_;
-
+	oc_page_pool *page_pool_;
 
 
 	void EncodeTo(struct oc_ssd_descriptor *ocdes, char *buf);

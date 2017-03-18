@@ -14,7 +14,6 @@ const GCPolicy kGCPolicy = kOneLunSerial;
 const AddrAllocPolicy kAddrAllocPolicy = kRoundRobin_Fixed;
 
 const int kOCFileNodeDegree = 6;
-
 };
 
 

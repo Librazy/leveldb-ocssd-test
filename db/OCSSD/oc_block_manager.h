@@ -85,6 +85,11 @@ public:
 	void TEST_Pr_UM();	
 	void TEST_Itr_rr_addr();
 
+	inline size_t ChunkSize()
+	{
+		return opt_.chunk_size;
+	}
+
 	size_t TEST_Get_ChunkSize()
 	{
 		return opt_.chunk_size;
@@ -108,7 +113,6 @@ private:
 
 
 	friend class oc_ssd;
-	friend class oc_file;
 	friend class oc_GC;
 
 	void def_ocblk_opt(struct Options *opt);

@@ -3,8 +3,16 @@
 
 #include "leveldb/status.h"
 
+//mutex & condition varieble headers
+#include "port/port.h"
+
 #include "oc_options.h"
 #include "oc_block_manager.h"
+
+//liblightnvm headers
+#include "liblightnvm.h"
+#include "nvm.h"
+
 
 
 namespace leveldb {
@@ -13,7 +21,14 @@ namespace ocssd {
 class oc_block_manager;
 class oc_ssd;
 
-class oc_file { //a "file" to support RandomAccessRead/AppendingWrite
+
+/*
+ * a non-posix file 
+ * support: 
+ *   - Random Access Read
+ *   - Append-only Write
+ */
+class oc_file { 
 public:
 	typedef oc_block_manager::rr_addr RR_Addr;
 	typedef oc_block_manager::StripeDes StripeDescriptor; //the "stripe" is in Block-Lun-Plane address format.
@@ -38,7 +53,7 @@ public:
 
 	leveldb::Status Append();
 	leveldb::Status RandomReadByOffset(); //Offset is byte-oriented.
-
+	leveldb::Status Flush();
 
 	//TESTS
 	void TEST_NodeList();
@@ -52,6 +67,7 @@ private:
 	struct Node {
 		size_t size;                    //Node's size in bytes
 		size_t degree;
+		size_t used;
 		struct Node *next;
 		struct Node *prev;
 		StripeDescriptor *stp_arr[1];
@@ -59,13 +75,19 @@ private:
 
 	//oc_file's Node
 	struct Node* AllocNode(int degree = oc_options::kOCFileNodeDegree);
-	void FreeNode(struct Node *n);
-	size_t AddStripe2Node(struct Node *n, StripeDescriptor *stripe);
+	static void FreeNode(struct Node *n);
+
+	static inline bool NodeFull(oc_file::Node *n)
+	{
+		return n->used == n->degree;
+	}
+
+	ssize_t AddStripe2Node(struct Node *n, StripeDescriptor *stripe);
 
 	struct Node* AddListTail(struct Node *listhead, struct Node *n);
 	void TravelList(struct Node *listhead, const char *job);
 
-
+	
 
 
 	friend class oc_ssd;
@@ -78,6 +100,7 @@ private:
 
 	oc_block_manager *const held_by_blkmng_;
 	oc_ssd *const held_by_;
+	const struct nvm_geo *const geo_;
 	leveldb::Status s;
 
 

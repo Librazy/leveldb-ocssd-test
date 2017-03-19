@@ -38,7 +38,6 @@ public:
 	void DeallocPage(oc_page* p);
 
 
-
 private:
 
 	friend class oc_ssd;
@@ -87,6 +86,31 @@ private:
 	const oc_page operator=(oc_page const &);
 };
 
+/* 
+ * a wrapper to oc_page. 
+ *  
+ */
+class oc_buffer{	
+public:
+	oc_buffer();
+	~oc_buffer();
+	append();
+	clear();
+	inline bool empty(){
+		return size_ == 0;
+	}
+	inline size_t size(){
+		return size_;
+	}
+
+	dump2file();
+
+
+private:
+	oc_page_pool *page_pool_;
+	std::vector<oc_page *> pages_;
+	size_t size_;
+};
 
 }//namespace ocssd
 }//namespace leveldb

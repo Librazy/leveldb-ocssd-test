@@ -6,6 +6,7 @@
 #include "nvm.h"
 
 #include "leveldb/status.h"
+#include "leveldb/env.h"
 
 //mutex & condition varieble headers
 #include "port/port.h"
@@ -21,26 +22,26 @@ namespace ocssd{
 
 class oc_ssd;
 class oc_page; 
-
+class oc_file;
 
 class oc_page_pool {
 public:
+	~oc_page_pool();
+	leveldb::Status AllocPage(oc_page **pptr); 
+	void DeallocPage(oc_page* p);
 
+	//TESTS
+
+
+private:
 	struct p_entry {
 		int degree_;
 		int usage_;
 		uint32_t bitmap_;
 		oc_page *reps[1];
 	};
-	
-	~oc_page_pool();
-	leveldb::Status AllocPage(oc_page **pptr); 
-	void DeallocPage(oc_page* p);
-
-
-private:
-
 	friend class oc_ssd;
+	friend class oc_page;
 
 	oc_page_pool(struct nvm_dev *dev);
 
@@ -68,6 +69,12 @@ public:
 	inline size_t Left(){
 		return reinterpret_cast<char*>(ptr_) + size_ - reinterpret_cast<char*>(ofs_);  
 	}
+	inline size_t content_len(){
+		return reinterpret_cast<char*>(ofs_) - reinterpret_cast<char*>(ptr_);
+	}
+	inline const char *content(){
+		return reinterpret_cast<const char*>(ptr_);
+	}
 	~oc_page();
 
 private:
@@ -92,10 +99,10 @@ private:
  */
 class oc_buffer{	
 public:
-	oc_buffer();
+	oc_buffer(oc_page_pool *p) : page_pool_(p), size_(0), active_(NULL){ }
 	~oc_buffer();
-	append();
-	clear();
+	void append(const char* data, size_t len);
+	void clear();
 	inline bool empty(){
 		return size_ == 0;
 	}
@@ -103,12 +110,16 @@ public:
 		return size_;
 	}
 
-	dump2file();
-
+	leveldb::Status dump2file(oc_file *f);
+	leveldb::Status dump2file(leveldb::WritableFile *f);
 
 private:
+	typedef std::vector<oc_page *>::iterator dump_iterator;
+	void cleanup();
+
+	oc_page *active_;
 	oc_page_pool *page_pool_;
-	std::vector<oc_page *> pages_;
+	std::vector<oc_page *> todump_;
 	size_t size_;
 };
 

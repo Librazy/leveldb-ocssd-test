@@ -28,7 +28,7 @@ class BlockBuilder {
   // Finish building the block and return a slice that refers to the
   // block contents.  The returned slice will remain valid for the
   // lifetime of this builder or until Reset() is called.
-  Slice Finish();
+  void Finish();
 
   // Returns an estimate of the current (uncompressed) size of the block
   // we are building.
@@ -36,7 +36,7 @@ class BlockBuilder {
 
   // Return true iff no entries have been added since the last Reset()
   bool empty() const {
-    return buffer_.empty();
+    return buffer_->empty();
   }
 
  private:

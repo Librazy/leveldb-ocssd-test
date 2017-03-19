@@ -56,12 +56,16 @@ public:
 	{
 		return blkmng_;
 	}
+	inline oc_page_pool* PagePool()
+	{
+		return page_pool_;
+	}
+
 	//TESTS
 	oc_block_manager* TEST_Get_BLK_MNG()
 	{
 		return blkmng_;
 	}
-
 	oc_file* TEST_New_file(const char *fname);
 
 public:

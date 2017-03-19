@@ -1,12 +1,14 @@
 #include "oc_page_cache.h"
 #include "oc_options.h"
 
+#include "leveldb/slice.h"
 
 #include "util/mutexlock.h"
 
 #include <cstring>
 #include <cassert>
 #include <cstdint>
+#include <stdlib.h>
 #include <malloc.h>
 
 namespace leveldb {
@@ -190,6 +192,65 @@ void oc_page_pool::DeallocPage(oc_page *p)
 		std::make_heap(const_cast<oc_page_pool::p_entry**>(&pool_.top()),
             const_cast<oc_page_pool::p_entry**>(&pool_.top()) + pool_.size(),
 			p_entry_cmp());
+	}
+}
+
+oc_buffer::~oc_buffer() 
+{
+	clear();
+}
+
+void oc_buffer::append(const char* data, size_t len)
+{
+	size_t wlen = 0;
+	leveldb::Status s;
+	while (wlen < len) {
+		if (active_) {
+			wlen += active_->Append(data + wlen, len - wlen);
+			if (wlen == len) {
+				size_ += len;
+				return;
+			}
+			todump_.push_back(active_);
+		}
+		
+		s = page_pool_->AllocPage(&active_);
+		if (!s.ok()) {
+			printf("%s\n", s.ToString().c_str());
+			abort();
+		}
+	}
+}
+
+void oc_buffer::clear()
+{
+	if (active_) {
+		todump_.push_back(active_);
+	}
+	cleanup();
+}
+
+void oc_buffer::cleanup()
+{
+	for (dump_iterator itr = todump_.begin();
+		 itr != todump_.end();
+		 ++itr) {
+		page_pool_->DeallocPage(*itr);
+	}
+}
+
+leveldb::Status oc_buffer::dump2file(oc_file *f)
+{
+}
+
+leveldb::Status oc_buffer::dump2file(leveldb::WritableFile *f)
+{
+	oc_page *ptr;
+	for (dump_iterator itr = todump_.begin();
+		 itr != todump_.end();
+		 ++itr) {
+		ptr = *itr;
+		f->Append(leveldb::Slice(ptr->content(), ptr->content_len()));
 	}
 }
 

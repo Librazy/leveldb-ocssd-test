@@ -45,6 +45,9 @@ oc_ssd::oc_ssd() : des_(new oc_ssd_descriptor(oc_options::kDevPath)), dev_(NULL)
 	if (s.ok()) {
 		s = oc_block_manager::New_oc_block_manager(this, &blkmng_);
 	}
+	if (s.ok()) {
+		s = oc_page_pool::New_page_pool(this->geo_, &page_pool_); 
+	}
 }
 oc_ssd::~oc_ssd()
 {
@@ -56,7 +59,13 @@ void oc_ssd::Setup()
 	//Open device
 	dev_ = nvm_dev_open(des_->dev_path_.c_str());
 	if (!dev_) {
-		s = Status::IOError("OCSSD Setup", strerror(errno));
+		s = Status::IOError("OCSSD Setup dev", strerror(errno));
+		return;
+	}
+	//geo
+	geo_ = nvm_dev_get_geo(dev_);
+	if (!geo_) {
+		s = Status::IOError("OCSSD Setup geo", strerror(errno));
 		return;
 	}
 
@@ -65,8 +74,6 @@ void oc_ssd::Setup()
 	if(!pmode_is_good(pmode_)){	///To be clean - is not necessary ?
 		s = Status::IOError("OCSSD get pmode error");
 	}
-
-	page_pool_ = new oc_page_pool(dev_);
 }
 void oc_ssd::Cleanup()
 {

@@ -49,7 +49,7 @@ public:
 
 	inline const struct nvm_geo *Geo()
 	{
-		return nvm_dev_get_geo(dev_);
+		return geo_;
 	}
 
 	inline oc_block_manager* Blkmng()
@@ -76,6 +76,7 @@ private:
 	friend class oc_GC;
 
 	struct nvm_dev *dev_;
+	const struct nvm_geo *geo_;
 	int pmode_;
 	struct oc_ssd_descriptor *des_;
 	oc_block_manager *blkmng_;

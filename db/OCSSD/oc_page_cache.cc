@@ -15,6 +15,13 @@ namespace leveldb {
 namespace ocssd {
 const int kPEntry_Degree = 32; //Must Be 32.
 
+static std::string int2str(int x)
+{
+	char buf[10];
+	sprintf(buf, "%d", x);
+	return std::string(buf);
+}
+
 
 oc_page::oc_page(void *mem, int i, oc_page_pool::p_entry *p) : ptr_(mem), ofs_(mem), idx_(i), held_(p)
 {
@@ -37,6 +44,14 @@ size_t oc_page::Append(const char* str, size_t len)
 	assert(ofs_ - ptr_ <= size_);
 	return actual;
 }
+static inline int bitmap2str(uint32_t bitmap, char* buf)
+{
+	for (int i = 0; i < 32; i++) {
+		buf[32 - i - 1] = bitmap & (1 << i) ? '#' : '0';
+	}
+	buf[32] = '\0';
+}
+
 /*
  * gaudent algorithm
  * require 	- only 1 bit of @x is 1. 
@@ -82,8 +97,19 @@ static inline void bitmap_unset(uint32_t *bitmap, int idx)
 
 
 
-oc_page_pool::oc_page_pool(struct nvm_dev *dev) : geo_(nvm_dev_get_geo(dev)), page_size_(geo_->page_nbytes)
+oc_page_pool::oc_page_pool(const struct nvm_geo *g) : ID_(0), geo_(g), page_size_(g->page_nbytes)
 {
+}
+leveldb::Status oc_page_pool::New_page_pool(const struct nvm_geo *g,  oc_page_pool** pptr)
+{
+	oc_page_pool* ptr;
+	*pptr = NULL;
+	ptr = new oc_page_pool(g);
+	if (ptr) {
+		*pptr = ptr;
+		return leveldb::Status::OK();
+	}
+	return leveldb::Status::IOError("oc_page_pool::New_page_pool failed.");
 }
 
 oc_page_pool::~oc_page_pool()
@@ -99,17 +125,82 @@ oc_page_pool::~oc_page_pool()
 	}
 }
 
+void oc_page_pool::TEST_Pr_Usage(const char *title)
+{
+	char buf[33];
+	oc_page_pool::p_entry* ptr;
+	std::vector<p_entry*> tmp;
+	printf("ID    Usage[%s]\n", title);
+
+	if (pool_.empty()) {
+		printf("--NULL--\n");
+		return;
+	}
+
+	while (!pool_.empty()) {
+		ptr = pool_.top();
+		bitmap2str(ptr->bitmap_, buf);
+		printf("%2d    %02d/32[%s]\n", ptr->id_, ptr->usage_, buf);
+		pool_.pop();
+		tmp.push_back(ptr);
+	}
+	for (std::vector<p_entry*>::iterator itr = tmp.begin();
+		  itr != tmp.end();
+		  ++itr) {
+		pool_.push(*itr);
+	}
+}
+
+void oc_page_pool::TEST_Basic()
+{
+	oc_page *ptr[65];
+	leveldb::Status s;
+	printf("alloc 65 pages-----\n");
+	for (int i = 0; i < 65; i++) {
+		s = this->AllocPage(&(ptr[i]));
+		if (!s.ok()) {
+			printf("alloc page failed: %s!\n", int2str(i).c_str());
+			return;
+		}
+		this->TEST_Pr_Usage(int2str(i).c_str());
+	}
+
+	printf("dealloc 65 pages-----\n");
+	for (int i = 0; i < 65; i++) {
+		this->DeallocPage(ptr[i]);
+		this->TEST_Pr_Usage(int2str(i).c_str());
+	}
+}
+
+void oc_page_pool::TEST_Queue()
+{
+	p_entry *a1, *a2, *a3, *ptr;
+	a1 = new p_entry();
+	a2 = new p_entry();
+	a1->usage_ = 32;
+	a2->usage_ = 1;
+	pool_.push(a1);
+	ptr = pool_.top();
+	printf("%d\n", ptr->usage_);
+
+	pool_.push(a2);
+	ptr = pool_.top();
+	printf("%d\n", ptr->usage_);
+}
+
 oc_page_pool::p_entry* oc_page_pool::Alloc_p_entry()
 {
 	int degree = kPEntry_Degree;
-	p_entry* ptr = (p_entry*) malloc(sizeof(p_entry) + (degree - 1) * sizeof(oc_page *));
+	oc_page_pool::p_entry* ptr = (p_entry*) malloc(sizeof(p_entry) + (degree - 1) * sizeof(oc_page *));
 	if(!ptr){
 		s = leveldb::Status::IOError("oc_page_pool::Alloc_p_entry", strerror(errno));
 		return NULL;
 	}
+	ptr->id_ = ID_;
 	ptr->degree_ = degree;
 	ptr->usage_ = 0;
 	ptr->bitmap_ = 0;
+	ID_++;
 
 	for (int i = 0; i < ptr->degree_; i++) {
 		void *mem = nvm_buf_alloc(geo_, page_size_);
@@ -140,39 +231,35 @@ leveldb::Status oc_page_pool::AllocPage(oc_page** pptr)
 	int slot = -1;
 	*pptr = NULL;
 	bool need_alloc = true;
-	if (!pool_.empty()) {
-		{
-			leveldb::MutexLock l(&pool_lock_);
+	{
+		leveldb::MutexLock l(& pool_lock_);
+
+		if (!pool_.empty()){
 			ptr = pool_.top();
 			slot = bitmap_get_slot(ptr->bitmap_);
-
 			assert(slot < kPEntry_Degree);
-			if (slot >= 0) {
+			if (slot >= 0){
 				pool_.pop();
 				need_alloc = false;
 			}
 		}
-	}
 
-	if (need_alloc) {
-		ptr = Alloc_p_entry();
-		if (!s.ok()) {
-			goto OUT;
+		if (need_alloc){		
+			ptr = Alloc_p_entry();
+			if (!s.ok()){
+				goto OUT; //TODO - Refine ?
+			}
+			slot = bitmap_get_slot(ptr->bitmap_);
 		}
-		slot = bitmap_get_slot(ptr->bitmap_);
-	}
 
-	assert(slot >= 0 && slot < kPEntry_Degree);
+		assert(slot >= 0 && slot < kPEntry_Degree);
 
-	//ptr is out of the queue. so don't need to LOCK.
-	bitmap_set(&(ptr->bitmap_), slot);
-	ptr->usage_++;
+		//ptr is out of the queue. so don't need to LOCK.
+		bitmap_set(&(ptr->bitmap_), slot);
+		ptr->usage_++;
 
-	{
-		leveldb::MutexLock l(&pool_lock_);
 		pool_.push(ptr);
 	}
-
 	*pptr = ptr->reps[slot];
 	
 OUT:

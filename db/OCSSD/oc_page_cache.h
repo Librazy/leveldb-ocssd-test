@@ -31,25 +31,33 @@ public:
 	void DeallocPage(oc_page* p);
 
 	//TESTS
+	void TEST_Pr_Usage(const char *title);
+	void TEST_Queue();
+	void TEST_Basic();
 
-
-private:
 	struct p_entry {
+		int id_;
 		int degree_;
 		int usage_;
 		uint32_t bitmap_;
 		oc_page *reps[1];
 	};
-	friend class oc_ssd;
-	friend class oc_page;
-
-	oc_page_pool(struct nvm_dev *dev);
 
 	struct p_entry_cmp{
 		bool operator()(p_entry *a, p_entry* b){
-			a->usage_ > b->usage_;
+			//printf("CALLED! %d %d, Ret:%d\n",a->usage_ , b->usage_, a->usage_ < b->usage_);
+			return a->usage_ > b->usage_;
 		}
 	};
+
+private:
+
+	friend class oc_ssd;
+	friend class oc_page;
+
+	oc_page_pool(const struct nvm_geo *g);
+	static leveldb::Status New_page_pool(const struct nvm_geo *g, oc_page_pool** pptr);
+
 
 	std::priority_queue<p_entry*, std::vector<p_entry*>, p_entry_cmp> pool_;
 	leveldb::port::Mutex pool_lock_;
@@ -57,8 +65,9 @@ private:
 	p_entry* Alloc_p_entry();
 	void Dealloc_p_entry(p_entry *pe); 
 
-	const size_t page_size_;
-	const struct nvm_geo * const geo_;
+	int ID_;
+	size_t page_size_;
+	const struct nvm_geo * geo_;
 	leveldb::Status s;
 };
 
@@ -76,6 +85,8 @@ public:
 		return reinterpret_cast<const char*>(ptr_);
 	}
 	~oc_page();
+
+	//TESTS
 
 private:
 	friend class oc_page_pool;
@@ -95,7 +106,8 @@ private:
 
 /* 
  * a wrapper to oc_page. 
- *  
+ * Support: I/O to oc_file, I/O to writablefile 
+ * Not Support: compress
  */
 class oc_buffer{	
 public:
@@ -112,6 +124,8 @@ public:
 
 	leveldb::Status dump2file(oc_file *f);
 	leveldb::Status dump2file(leveldb::WritableFile *f);
+
+	//TESTS
 
 private:
 	typedef std::vector<oc_page *>::iterator dump_iterator;

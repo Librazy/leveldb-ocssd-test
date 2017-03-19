@@ -125,7 +125,7 @@ private:
 	void Add_blks(size_t blks);
 	void Set_stripe_blks_as(struct StripeDes des, BlkState_t flag);
 
-	oc_block_manager(oc_ssd *ssd);
+	oc_block_manager(oc_ssd *ssd, const struct nvm_geo *g);
 
 	/*
 	 * oc_block_manager factory function
@@ -133,7 +133,7 @@ private:
 	static leveldb::Status New_oc_block_manager(oc_ssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
 
 	oc_ssd *const ssd_;
-	const struct nvm_geo *const geo_;
+	const struct nvm_geo * geo_;
 	struct nvm_bbt **bbts_;
 	int bbts_length_;
 	int blks_length_;

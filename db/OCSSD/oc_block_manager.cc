@@ -598,7 +598,7 @@ void oc_block_manager::Init()
 	InitClean();
 }
 
-oc_block_manager::oc_block_manager(oc_ssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
+oc_block_manager::oc_block_manager(oc_ssd *ssd, const struct nvm_geo *g) : ssd_(ssd), geo_(g)
 {
 	def_ocblk_opt(&opt_);
 	Init();
@@ -609,7 +609,7 @@ oc_block_manager::oc_block_manager(oc_ssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_ge
  */
 leveldb::Status oc_block_manager::New_oc_block_manager(oc_ssd *ssd,  oc_block_manager **oc_blk_mng_ptr)
 {
-	oc_block_manager *ptr = new oc_block_manager(ssd);
+	oc_block_manager *ptr = new oc_block_manager(ssd, ssd->Geo()); 
 	*oc_blk_mng_ptr = ptr->ok() ? ptr : NULL;
 	return ptr->s;
 }

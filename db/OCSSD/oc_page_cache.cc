@@ -22,6 +22,13 @@ static std::string int2str(int x)
 	return std::string(buf);
 }
 
+static void buffill(char *buf, int len)
+{
+	for (int i = 0; i < len; i++) {
+		buf[i] = 'a' + (((i << 2) + i & 0x913af) % 26);
+	}
+}
+
 
 oc_page::oc_page(void *mem, int i, oc_page_pool::p_entry *p) : ptr_(mem), ofs_(mem), idx_(i), held_(p)
 {
@@ -36,15 +43,42 @@ oc_page::~oc_page()
 /*
  * usable range: [ofs_, ptr_ + size_)
  */
-size_t oc_page::Append(const char* str, size_t len)
+size_t oc_page::Append(const char *str, size_t len)
 {
 	size_t actual = NVM_MIN(Left(), len);
 	memcpy(ofs_, str, actual);
-	ofs_ = reinterpret_cast<void*>(reinterpret_cast<char*>(ofs_) + actual);
+	ofs_ = reinterpret_cast<void *>(reinterpret_cast<char *>(ofs_) + actual);
 	assert(ofs_ - ptr_ <= size_);
 	return actual;
 }
-static inline int bitmap2str(uint32_t bitmap, char* buf)
+
+void oc_page::TEST_Info()
+{
+	printf("%p %p %zu\n", this->ptr_, this->ofs_, this->size_);
+}
+void oc_page::TEST_Basic()
+{
+	char buf[1024];
+	buffill(buf, 1024);
+	buf[1023] = '\0';
+
+	size_t ret = this->Append(buf, 1023);
+	ret = this->Append(buf, 1023);
+	ret = this->Append(buf, 1023);
+	ret = this->Append(buf, 1023);
+	ret = this->Append(buf, 1024);
+
+	this->TEST_Info();
+	printf("ret: %zu\n", ret);
+	printf("write len : %d\n", 1023 * 5 + 1);
+	printf("actual len: %zu\n", this->content_len());
+	printf("write : [%s] * 5\n", buf);
+	printf("actual: %s\n", this->content());
+	printf("left:   %zu\n", this->Left());
+}
+
+
+static inline int bitmap2str(uint32_t bitmap, char *buf)
 {
 	for (int i = 0; i < 32; i++) {
 		buf[32 - i - 1] = bitmap & (1 << i) ? '#' : '0';
@@ -61,12 +95,12 @@ static inline int bitmap2str(uint32_t bitmap, char* buf)
  */
 static inline int bitmap_ntz32(uint32_t x)
 {
-	int b4,b3,b2,b1,b0;
-	b4 = (x & 0x0000ffff)? 0:16;
-	b3 = (x & 0x00ff00ff)? 0:8;
-	b2 = (x & 0x0f0f0f0f)? 0:4;
-	b1 = (x & 0x33333333)? 0:2;
-	b0 = (x & 0x55555555)? 0:1;
+	int b4, b3, b2, b1, b0;
+	b4 = (x & 0x0000ffff) ? 0 : 16;
+	b3 = (x & 0x00ff00ff) ? 0 : 8;
+	b2 = (x & 0x0f0f0f0f) ? 0 : 4;
+	b1 = (x & 0x33333333) ? 0 : 2;
+	b0 = (x & 0x55555555) ? 0 : 1;
 	return b0 + b1 + b2 + b3 + b4;
 }
 
@@ -75,10 +109,10 @@ static inline int bitmap_ntz32(uint32_t x)
  */
 static int bitmap_get_slot(uint32_t bitmap)
 {
-	if(~bitmap == 0){
-		return -1;//FULL
+	if (~bitmap == 0) {
+		return -1; //FULL
 	}
-	uint32_t x = bitmap | (bitmap + 1);//first bit 0 ==> 1
+	uint32_t x = bitmap | (bitmap + 1); //first bit 0 ==> 1
 	x = x & (~bitmap);
 
 	return bitmap_ntz32(x);
@@ -86,23 +120,22 @@ static int bitmap_get_slot(uint32_t bitmap)
 
 static inline void bitmap_set(uint32_t *bitmap, int idx)
 {
-	*bitmap = *bitmap | (1 << idx );
+	*bitmap = *bitmap | (1 << idx);
 }
 
 static inline void bitmap_unset(uint32_t *bitmap, int idx)
 {
-	*bitmap = *bitmap & (~(1 << idx ));
+	*bitmap = *bitmap & (~(1 << idx));
 }
-
-
 
 
 oc_page_pool::oc_page_pool(const struct nvm_geo *g) : ID_(0), geo_(g), page_size_(g->page_nbytes)
 {
 }
-leveldb::Status oc_page_pool::New_page_pool(const struct nvm_geo *g,  oc_page_pool** pptr)
+
+leveldb::Status oc_page_pool::New_page_pool(const struct nvm_geo *g,  oc_page_pool **pptr)
 {
-	oc_page_pool* ptr;
+	oc_page_pool *ptr;
 	*pptr = NULL;
 	ptr = new oc_page_pool(g);
 	if (ptr) {
@@ -115,7 +148,7 @@ leveldb::Status oc_page_pool::New_page_pool(const struct nvm_geo *g,  oc_page_po
 oc_page_pool::~oc_page_pool()
 {
 	oc_page_pool::p_entry *ptr;
-	{ 
+	{
 		leveldb::MutexLock l(&pool_lock_);
 		while (!pool_.empty()) {
 			ptr = pool_.top();
@@ -128,8 +161,8 @@ oc_page_pool::~oc_page_pool()
 void oc_page_pool::TEST_Pr_Usage(const char *title)
 {
 	char buf[33];
-	oc_page_pool::p_entry* ptr;
-	std::vector<p_entry*> tmp;
+	oc_page_pool::p_entry *ptr;
+	std::vector<p_entry *> tmp;
 	printf("ID    Usage[%s]\n", title);
 
 	if (pool_.empty()) {
@@ -144,9 +177,9 @@ void oc_page_pool::TEST_Pr_Usage(const char *title)
 		pool_.pop();
 		tmp.push_back(ptr);
 	}
-	for (std::vector<p_entry*>::iterator itr = tmp.begin();
-		  itr != tmp.end();
-		  ++itr) {
+	for (std::vector<p_entry *>::iterator itr = tmp.begin();
+		itr != tmp.end();
+		++itr) {
 		pool_.push(*itr);
 	}
 }
@@ -174,7 +207,7 @@ void oc_page_pool::TEST_Basic()
 
 void oc_page_pool::TEST_Queue()
 {
-	p_entry *a1, *a2, *a3, *ptr;
+	p_entry * a1,*a2,*a3,*ptr;
 	a1 = new p_entry();
 	a2 = new p_entry();
 	a1->usage_ = 32;
@@ -191,8 +224,8 @@ void oc_page_pool::TEST_Queue()
 oc_page_pool::p_entry* oc_page_pool::Alloc_p_entry()
 {
 	int degree = kPEntry_Degree;
-	oc_page_pool::p_entry* ptr = (p_entry*) malloc(sizeof(p_entry) + (degree - 1) * sizeof(oc_page *));
-	if(!ptr){
+	oc_page_pool::p_entry *ptr = (p_entry *)malloc(sizeof(p_entry) + (degree - 1) * sizeof(oc_page *));
+	if (!ptr) {
 		s = leveldb::Status::IOError("oc_page_pool::Alloc_p_entry", strerror(errno));
 		return NULL;
 	}
@@ -217,7 +250,7 @@ oc_page_pool::p_entry* oc_page_pool::Alloc_p_entry()
 
 void oc_page_pool::Dealloc_p_entry(oc_page_pool::p_entry *pe)
 {
-	if(pe){
+	if (pe) {
 		for (int i = 0; i < pe->degree_; i++) {
 			delete pe->reps[i];
 		}
@@ -225,28 +258,28 @@ void oc_page_pool::Dealloc_p_entry(oc_page_pool::p_entry *pe)
 	}
 }
 
-leveldb::Status oc_page_pool::AllocPage(oc_page** pptr)
+leveldb::Status oc_page_pool::AllocPage(oc_page **pptr)
 {
 	oc_page_pool::p_entry *ptr = NULL;
 	int slot = -1;
 	*pptr = NULL;
 	bool need_alloc = true;
 	{
-		leveldb::MutexLock l(& pool_lock_);
+		leveldb::MutexLock l(&pool_lock_);
 
-		if (!pool_.empty()){
+		if (!pool_.empty()) {
 			ptr = pool_.top();
 			slot = bitmap_get_slot(ptr->bitmap_);
 			assert(slot < kPEntry_Degree);
-			if (slot >= 0){
+			if (slot >= 0) {
 				pool_.pop();
 				need_alloc = false;
 			}
 		}
 
-		if (need_alloc){		
+		if (need_alloc) {
 			ptr = Alloc_p_entry();
-			if (!s.ok()){
+			if (!s.ok()) {
 				goto OUT; //TODO - Refine ?
 			}
 			slot = bitmap_get_slot(ptr->bitmap_);
@@ -261,7 +294,7 @@ leveldb::Status oc_page_pool::AllocPage(oc_page** pptr)
 		pool_.push(ptr);
 	}
 	*pptr = ptr->reps[slot];
-	
+
 OUT:
 	return s;
 }
@@ -276,70 +309,187 @@ void oc_page_pool::DeallocPage(oc_page *p)
 		leveldb::MutexLock l(&pool_lock_);
 		bitmap_unset(&(p->held_->bitmap_), p->idx_);
 		p->held_->usage_--;
-		std::make_heap(const_cast<oc_page_pool::p_entry**>(&pool_.top()),
-            const_cast<oc_page_pool::p_entry**>(&pool_.top()) + pool_.size(),
+		std::make_heap(const_cast<oc_page_pool::p_entry **>(&pool_.top()),
+			const_cast<oc_page_pool::p_entry **>(&pool_.top()) + pool_.size(),
 			p_entry_cmp());
 	}
 }
 
-oc_buffer::~oc_buffer() 
+
+oc_buffer::~oc_buffer()
 {
 	clear();
 }
 
-void oc_buffer::append(const char* data, size_t len)
+void oc_buffer::append(const char *data, size_t len)
 {
 	size_t wlen = 0;
 	leveldb::Status s;
+	int itr = 0;
 	while (wlen < len) {
 		if (active_) {
 			wlen += active_->Append(data + wlen, len - wlen);
+			printf("len: %zu; has write: %zu; itr: %d\n", len, wlen, itr);
 			if (wlen == len) {
 				size_ += len;
 				return;
 			}
 			todump_.push_back(active_);
 		}
-		
+
 		s = page_pool_->AllocPage(&active_);
 		if (!s.ok()) {
 			printf("%s\n", s.ToString().c_str());
 			abort();
 		}
+		itr++;
+	}
+}
+
+void oc_buffer::push_active()
+{
+	if (active_) {
+		todump_.push_back(active_);
+		active_ = NULL;
 	}
 }
 
 void oc_buffer::clear()
 {
-	if (active_) {
-		todump_.push_back(active_);
-	}
+	push_active();
 	cleanup();
 }
 
 void oc_buffer::cleanup()
 {
+	size_ = 0;
 	for (dump_iterator itr = todump_.begin();
-		 itr != todump_.end();
-		 ++itr) {
+		itr != todump_.end();
+		++itr) {
 		page_pool_->DeallocPage(*itr);
 	}
+}
+leveldb::Status oc_buffer::dump2file()
+{
+	leveldb::Status s;
+	oc_page *ptr;
+	push_active();
+//	printf("vector_size: %zu\n", todump_.size());
+
+	for (dump_iterator itr = todump_.begin();
+		itr != todump_.end();
+		++itr) {
+		ptr = *itr;
+		size_t i = 0;
+		while (i < ptr->content_len()) {
+			printf("%c", *(ptr->content() + i));
+			i++;
+		}
+	}
+	return s;
 }
 
 leveldb::Status oc_buffer::dump2file(oc_file *f)
 {
+	leveldb::Status s;
+	return s;
 }
 
 leveldb::Status oc_buffer::dump2file(leveldb::WritableFile *f)
 {
+	leveldb::Status s;
 	oc_page *ptr;
+	push_active();
 	for (dump_iterator itr = todump_.begin();
-		 itr != todump_.end();
-		 ++itr) {
+		itr != todump_.end();
+		++itr) {
 		ptr = *itr;
 		f->Append(leveldb::Slice(ptr->content(), ptr->content_len()));
 	}
+	return s;
 }
 
-}//namespace ocssd
-}//namespace leveldb
+//TESTS
+void oc_buffer::TEST_Basic()
+{
+	char buf[1024];
+	buffill(buf, 1024);
+	buf[11] = '\0';
+	this->append(buf, 10);
+//	this->append(buf, 10);
+//	this->append(buf, 10);
+	this->append(buf + 10, 1);
+	printf("oc_buffer_size: %zu\n",  this->size());
+
+	printf("write:  %s\n", buf);
+	printf("actual: ");
+	this->dump2file();
+	printf("\n");
+}
+
+void oc_buffer::TEST_Large()
+{
+	char buf[1024];
+	buffill(buf, 1024);
+	buf[999] = '\0';
+	this->append(buf, 1000);
+	this->append(buf, 1000);
+	this->append(buf, 1000);
+	this->append(buf, 1000);
+	this->append(buf, 1000);
+	printf("oc_buffer_size: %zu\n",  this->size());
+
+	printf("write:  %s\n", buf);
+	printf("actual: ");
+	this->dump2file();
+	printf("\n");
+}
+
+void oc_buffer::TEST_Large2()
+{
+	char *buf = (char *)malloc(sizeof(char) * 8000);
+	buffill(buf, 8000);
+	buf[7999] = '\0';
+
+	this->append(buf, 8000);
+	printf("oc_buffer_size: %zu\n",  this->size());
+
+	printf("write:  %s\n", buf);
+	printf("actual: ");
+	this->dump2file();
+	printf("\n");
+	free(buf);
+}
+
+void oc_buffer::TEST_WritableFile()
+{
+	leveldb::WritableFile *file;
+	leveldb::Env *env = leveldb::Env::Default();
+	leveldb::Status s = env->NewWritableFile("oc_buffer::TEST_WritableFile.out", &file);
+	if (!s.ok()) {
+		printf("New file failed.\n");
+		return;
+	}
+
+	char buf2[100];
+	char *buf = (char *)malloc(sizeof(char) * 8000);
+	buffill(buf, 8000);
+	buf[7999] = '\0';
+
+	this->append(buf, 8000);
+
+	snprintf(buf2, 100, "oc_buffer_size: %zu\nwrite:  ",  this->size());
+	file->Append(leveldb::Slice(buf2));
+	file->Append(leveldb::Slice(buf));
+	file->Append("\n");
+	file->Append("actual: ");
+	this->dump2file(file);
+	file->Append("\n");
+	file->Flush();
+	file->Close();
+
+	free(buf);
+}
+
+} //namespace ocssd
+} //namespace leveldb

@@ -1,0 +1,6 @@
+construct ok.
+len: 10; has write: 10
+len: 1; has write: 1
+oc_buffer_size: 11
+write:  afkpejojoti
+actual: afkpejojoti

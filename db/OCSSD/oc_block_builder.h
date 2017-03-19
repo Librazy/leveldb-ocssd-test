@@ -12,7 +12,9 @@
 namespace leveldb {
 namespace ocssd{
 
-//struct leveldb::Options;
+/*
+ * BlockBuilder for ocssd port. slightly modified from leveldb's original BlockBuilder.
+ */
 
 class BlockBuilder {
  public:

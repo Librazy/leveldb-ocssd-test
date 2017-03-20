@@ -404,7 +404,10 @@ leveldb::Status oc_buffer::dump2file(leveldb::WritableFile *f)
 		itr != todump_.end();
 		++itr) {
 		ptr = *itr;
-		f->Append(leveldb::Slice(ptr->content(), ptr->content_len()));
+		s = f->Append(leveldb::Slice(ptr->content(), ptr->content_len()));
+		if (!s.ok()) {
+			break;
+		}
 	}
 	return s;
 }
@@ -489,6 +492,11 @@ void oc_buffer::TEST_WritableFile()
 	file->Close();
 
 	free(buf);
+}
+
+leveldb::Status oc_buffer::CrcValue(char *buf)
+{
+
 }
 
 } //namespace ocssd

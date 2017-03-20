@@ -121,6 +121,8 @@ public:
 	void append(const char *data, size_t len);
 	void clear();
 
+
+
 	inline bool empty()
 	{
 		return size_ == 0;
@@ -133,6 +135,8 @@ public:
 	leveldb::Status dump2file();
 	leveldb::Status dump2file(oc_file *f);
 	leveldb::Status dump2file(leveldb::WritableFile *f);
+
+	uint32_t CRCValue();
 
 	//TESTS
 	void TEST_Basic();

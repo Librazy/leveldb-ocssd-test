@@ -30,7 +30,7 @@ class BlockBuilder {
   // Finish building the block and return a slice that refers to the
   // block contents.  The returned slice will remain valid for the
   // lifetime of this builder or until Reset() is called.
-  void Finish();
+  ocssd::oc_buffer* Finish();
 
   // Returns an estimate of the current (uncompressed) size of the block
   // we are building.
@@ -43,7 +43,7 @@ class BlockBuilder {
 
  private:
   const Options*        options_;
-  oc_buffer*            buffer_;      // Destination buffer(Use oc_page_cache)
+  ocssd::oc_buffer*     buffer_;      // Destination buffer(Use oc_page_cache)
   std::vector<uint32_t> restarts_;    // Restart points
   int                   counter_;     // Number of entries emitted since restart
   bool                  finished_;    // Has Finish() been called?

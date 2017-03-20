@@ -76,14 +76,15 @@ size_t BlockBuilder::CurrentSizeEstimate() const {
           sizeof(uint32_t));                      // Restart array length
 }
 
-void BlockBuilder::Finish() {
+ocssd::oc_buffer* BlockBuilder::Finish() 
+{ 
   // Append restart array
   for (size_t i = 0; i < restarts_.size(); i++) {
     OBPutFixed32(buffer_, restarts_[i]);
   }
   OBPutFixed32(buffer_, restarts_.size());
   finished_ = true;
-  return ;
+  return buffer_;
 }
 
 void BlockBuilder::Add(const Slice& key, const Slice& value) {

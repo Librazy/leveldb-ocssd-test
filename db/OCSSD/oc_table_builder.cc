@@ -21,17 +21,17 @@ namespace leveldb {
 namespace ocssd {
 
 struct TableBuilder::Rep {
-  Options options;
-  Options index_block_options;
-  WritableFile* file;
+  leveldb::Options options;
+  leveldb::Options index_block_options;
+  leveldb::WritableFile* file;
   uint64_t offset;
-  Status status;
-  BlockBuilder data_block;
-  BlockBuilder index_block;
+  leveldb::Status status;
+  ocssd::BlockBuilder data_block;
+  ocssd::BlockBuilder index_block;
   std::string last_key;
   int64_t num_entries;
   bool closed;          // Either Finish() or Abandon() has been called.
-  FilterBlockBuilder* filter_block;
+  leveldb::FilterBlockBuilder* filter_block;
 
   // We do not emit the index entry for a block until we have seen the
   // first key for the next data block.  This allows us to use shorter
@@ -43,11 +43,11 @@ struct TableBuilder::Rep {
   //
   // Invariant: r->pending_index_entry is true only if data_block is empty.
   bool pending_index_entry;
-  BlockHandle pending_handle;  // Handle to add to index block
+  leveldb::BlockHandle pending_handle;  // Handle to add to index block
 
   std::string compressed_output;
 
-  Rep(const Options& opt, WritableFile* f)
+  Rep(const leveldb::Options& opt, leveldb::WritableFile* f)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -57,7 +57,7 @@ struct TableBuilder::Rep {
         num_entries(0),
         closed(false),
         filter_block(opt.filter_policy == NULL ? NULL
-                     : new FilterBlockBuilder(opt.filter_policy)),
+                     : new leveldb::FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
     index_block_options.block_restart_interval = 1;
   }
@@ -146,18 +146,18 @@ void TableBuilder::WriteBlock(ocssd::BlockBuilder* block, BlockHandle* handle) {
   //    crc: uint32
   assert(ok());
   Rep* r = rep_;
-  Slice raw = block->Finish();
+  ocssd::oc_buffer* raw = block->Finish(); 
 
-  Slice block_contents;
   CompressionType type = r->options.compression;
-  // TODO(postrelease): Support more compression options: zlib?
+  assert(type == kNoCompression); //TODO - need implement in oc_buffer to support snappy_compress
+
   switch (type) {
     case kNoCompression:
-      block_contents = raw;
       break;
 
     case kSnappyCompression: {
-      std::string* compressed = &r->compressed_output;
+/*
+	  std::string* compressed = &r->compressed_output;
       if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
           compressed->size() < raw.size() - (raw.size() / 8u)) {
         block_contents = *compressed;
@@ -167,26 +167,28 @@ void TableBuilder::WriteBlock(ocssd::BlockBuilder* block, BlockHandle* handle) {
         block_contents = raw;
         type = kNoCompression;
       }
+*/
       break;
     }
   }
-  WriteRawBlock(block_contents, type, handle);
+  WriteRawBlock(raw, type, handle);
   r->compressed_output.clear();
   block->Reset();
 }
 
-void TableBuilder::WriteRawBlock(const Slice& block_contents,
+void TableBuilder::WriteRawBlock(ocssd::oc_buffer *buffer,
                                  CompressionType type,
                                  BlockHandle* handle) {
   Rep* r = rep_;
   handle->set_offset(r->offset);
-  handle->set_size(block_contents.size());
-  r->status = r->file->Append(block_contents);
+  handle->set_size(buffer->size());
+  r->status = buffer->dump2file(r->file);
+
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
-    uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
-    crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
+    //uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
+    //crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer+1, crc32c::Mask(crc));
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
     if (r->status.ok()) {

@@ -20,7 +20,7 @@
 namespace leveldb {
 namespace ocssd {
 
-struct TableBuilder::Rep {
+struct ocssd::TableBuilder::Rep {
   leveldb::Options options;
   leveldb::Options index_block_options;
   leveldb::WritableFile* file;
@@ -59,6 +59,7 @@ struct TableBuilder::Rep {
         filter_block(opt.filter_policy == NULL ? NULL
                      : new leveldb::FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
+	options.compression = kNoCompression;
     index_block_options.block_restart_interval = 1;
   }
 };
@@ -176,6 +177,64 @@ void TableBuilder::WriteBlock(ocssd::BlockBuilder* block, BlockHandle* handle) {
   block->Reset();
 }
 
+
+void TableBuilder::WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle)
+{
+  // File format contains a sequence of blocks where each block has:
+  //    block_data: uint8[n]
+  //    type: uint8
+  //    crc: uint32
+  assert(ok());
+  Rep* r = rep_;
+  Slice raw = block->Finish();
+
+  Slice block_contents;
+  CompressionType type = r->options.compression;
+  // TODO(postrelease): Support more compression options: zlib?
+  switch (type) {
+    case kNoCompression:
+      block_contents = raw;
+      break;
+
+    case kSnappyCompression: {
+      std::string* compressed = &r->compressed_output;
+      if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
+          compressed->size() < raw.size() - (raw.size() / 8u)) {
+        block_contents = *compressed;
+      } else {
+        // Snappy not supported, or compressed less than 12.5%, so just
+        // store uncompressed form
+        block_contents = raw;
+        type = kNoCompression;
+      }
+      break;
+    }
+  }
+  WriteRawBlock(block_contents, type, handle);
+  r->compressed_output.clear();
+  block->Reset();
+}
+
+//original block is used when Tablebuilder::Finish.
+void TableBuilder::WriteRawBlock(const Slice& data, CompressionType, BlockHandle *handle)
+{
+  Rep* r = rep_;
+  handle->set_offset(r->offset);
+  handle->set_size(block_contents.size());
+  r->status = r->file->Append(block_contents);
+  if (r->status.ok()) {
+    char trailer[kBlockTrailerSize];
+    trailer[0] = type;
+    uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
+    crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
+    EncodeFixed32(trailer+1, crc32c::Mask(crc));
+    r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
+    if (r->status.ok()) {
+      r->offset += block_contents.size() + kBlockTrailerSize;
+    }
+  }
+}
+
 void TableBuilder::WriteRawBlock(ocssd::oc_buffer *buffer,
                                  CompressionType type,
                                  BlockHandle* handle) {
@@ -187,8 +246,8 @@ void TableBuilder::WriteRawBlock(ocssd::oc_buffer *buffer,
   if (r->status.ok()) {
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
-    //uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
-    //crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
+	uint32_t crc = buffer->CRCValue();
+    crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer+1, crc32c::Mask(crc));
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
     if (r->status.ok()) {

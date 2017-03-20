@@ -4,6 +4,7 @@
 #include "leveldb/slice.h"
 
 #include "util/mutexlock.h"
+#include "util/crc32c.h"
 
 #include <cstring>
 #include <cassert>
@@ -494,9 +495,26 @@ void oc_buffer::TEST_WritableFile()
 	free(buf);
 }
 
-leveldb::Status oc_buffer::CrcValue(char *buf)
+uint32_t oc_buffer::CRCValue()
 {
+	oc_page *ptr;
+	uint32_t crc;
+	dump_iterator itr;
 
+	push_active();
+
+	itr = todump_.begin();
+	ptr = *itr;
+	crc = leveldb::crc32c::Value(ptr->content(), ptr->content_len());
+	++itr;
+
+	for (;
+		itr != todump_.end();
+		++itr) {
+		ptr = *itr;
+		crc = leveldb::crc32c::Extend(crc, ptr->content(), ptr->content_len());
+	}
+	return crc;
 }
 
 } //namespace ocssd

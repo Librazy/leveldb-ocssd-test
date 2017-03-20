@@ -56,7 +56,6 @@ struct TableBuilder::Rep {
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
-	options.compression = kNoCompression;
     index_block_options.block_restart_interval = 1;
   }
 };

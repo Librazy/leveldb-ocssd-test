@@ -18,8 +18,8 @@ namespace ocssd{
 
 class BlockBuilder {
  public:
-  explicit BlockBuilder(const leveldb::Options* options);
-
+  explicit BlockBuilder(const leveldb::Options* options, oc_page_pool *p);
+  ~BlockBuilder();
   // Reset the contents as if the BlockBuilder was just constructed.
   void Reset();
 

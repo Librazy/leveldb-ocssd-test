@@ -37,7 +37,7 @@ public:
 	// Create a builder that will store the contents of the table it is
 	// building in *file.  Does not close the file.  It is up to the
 	// caller to close the file after calling Finish().
-	TableBuilder(const Options& options, WritableFile *file);
+	TableBuilder(const Options& options, WritableFile *file, oc_page_pool *p);
 
 	// REQUIRES: Either Finish() or Abandon() has been called.
 	~TableBuilder();
@@ -87,7 +87,6 @@ private:
 	bool ok() const { return status().ok(); }
 
 	void WriteBlock(ocssd::BlockBuilder *block, BlockHandle *handle);
-
 	void WriteRawBlock(ocssd::oc_buffer *buffer, CompressionType, BlockHandle *handle);
 
 	void WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle);

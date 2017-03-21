@@ -79,8 +79,8 @@ private:
 	void WriteBlock(ocssd::BlockBuilder *block, BlockHandle *handle);
 	void WriteRawBlock(ocssd::oc_buffer *buffer, CompressionType, BlockHandle *handle);
 
-	void WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle);
-	void WriteRawBlock(const Slice& data, CompressionType, BlockHandle *handle);
+	void WriteBlockOrg(leveldb::BlockBuilder *block, BlockHandle *handle);
+	void WriteRawBlockOrg(const Slice& data, CompressionType, BlockHandle *handle);
 
 	struct Rep;
 	Rep *rep_;

@@ -87,6 +87,7 @@ public:
 	{
 		return reinterpret_cast<const char *>(ptr_);
 	}
+	
 	~oc_page();
 
 	//TESTS
@@ -95,6 +96,8 @@ public:
 
 private:
 	friend class oc_page_pool;
+	friend class oc_buffer;
+	void clear();
 
 	oc_page_pool::p_entry *held_;
 	void*		ptr_;
@@ -120,8 +123,8 @@ public:
 	~oc_buffer();
 	void append(const char *data, size_t len);
 	void clear();
-
-
+	
+	void pr_pagesinfo();
 
 	inline bool empty()
 	{
@@ -143,15 +146,18 @@ public:
 	void TEST_Large();
 	void TEST_Large2();
 	void TEST_WritableFile();
+	void TEST_WritableFile_Clear_Again();
 private:
 	typedef std::vector<oc_page *>::iterator dump_iterator;
 	void push_active();
 	void cleanup();
+	void update_pagesinfo();
 
 	oc_page*				active_;
 	oc_page_pool*			page_pool_;
 	std::vector<oc_page *> 	todump_;
 	size_t 					size_;
+	std::string				info_;
 };
 
 } //namespace ocssd

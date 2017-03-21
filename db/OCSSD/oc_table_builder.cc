@@ -193,7 +193,7 @@ void TableBuilder::WriteBlock(ocssd::BlockBuilder *block, BlockHandle *handle)
 }
 
 
-void TableBuilder::WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle)
+void TableBuilder::WriteBlockOrg(leveldb::BlockBuilder *block, BlockHandle *handle)
 {
 	// File format contains a sequence of blocks where each block has:
 	//    block_data: uint8[n]
@@ -226,13 +226,13 @@ void TableBuilder::WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle)
 			break;
 		}
 	}
-	WriteRawBlock(block_contents, type, handle);
+	WriteRawBlockOrg(block_contents, type, handle);
 	r->compressed_output.clear();
 	block->Reset();
 }
 
 //original block is used when Tablebuilder::Finish.
-void TableBuilder::WriteRawBlock(const Slice& block_contents, 
+void TableBuilder::WriteRawBlockOrg(const Slice& block_contents, 
 	CompressionType type, 
 	BlockHandle *handle)
 {
@@ -291,7 +291,7 @@ Status TableBuilder::Finish()
 
 	// Write filter block
 	if (ok() && r->filter_block != NULL) {
-		WriteRawBlock(r->filter_block->Finish(), kNoCompression,
+		WriteRawBlockOrg(r->filter_block->Finish(), kNoCompression,
 			&filter_block_handle);
 	}
 
@@ -308,7 +308,7 @@ Status TableBuilder::Finish()
 		}
 
 		// TODO(postrelease): Add stats and other meta blocks
-		WriteBlock(&meta_index_block, &metaindex_block_handle);
+		WriteBlockOrg(&meta_index_block, &metaindex_block_handle);
 	}
 
 	// Write index block
@@ -325,7 +325,7 @@ Status TableBuilder::Finish()
 
 	// Write footer
 	if (ok()) {
-		Footer footer;
+		leveldb::Footer footer;
 		footer.set_metaindex_handle(metaindex_block_handle);
 		footer.set_index_handle(index_block_handle);
 		std::string footer_encoding;

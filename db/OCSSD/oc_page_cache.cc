@@ -53,6 +53,11 @@ size_t oc_page::Append(const char *str, size_t len)
 	return actual;
 }
 
+void oc_page::clear()
+{
+	ofs_ = ptr_;
+}
+
 void oc_page::TEST_Info()
 {
 	printf("%p %p %zu\n", this->ptr_, this->ofs_, this->size_);
@@ -308,6 +313,8 @@ void oc_page_pool::DeallocPage(oc_page *p)
 {
 	{
 		leveldb::MutexLock l(&pool_lock_);
+		p->clear();
+
 		bitmap_unset(&(p->held_->bitmap_), p->idx_);
 		p->held_->usage_--;
 		std::make_heap(const_cast<oc_page_pool::p_entry **>(&pool_.top()),
@@ -330,7 +337,7 @@ void oc_buffer::append(const char *data, size_t len)
 	while (wlen < len) {
 		if (active_) {
 			wlen += active_->Append(data + wlen, len - wlen);
-			printf("len: %zu; has write: %zu; itr: %d\n", len, wlen, itr);
+//			printf("[oc_buffer] - len: %zu; has write: %zu; itr: %d\n", len, wlen, itr);
 			if (wlen == len) {
 				size_ += len;
 				return;
@@ -340,7 +347,7 @@ void oc_buffer::append(const char *data, size_t len)
 
 		s = page_pool_->AllocPage(&active_);
 		if (!s.ok()) {
-			printf("%s\n", s.ToString().c_str());
+			printf("[oc_buffer] %s\n", s.ToString().c_str());
 			abort();
 		}
 		itr++;
@@ -369,6 +376,7 @@ void oc_buffer::cleanup()
 		++itr) {
 		page_pool_->DeallocPage(*itr);
 	}
+	todump_.clear();
 }
 leveldb::Status oc_buffer::dump2file()
 {
@@ -376,7 +384,7 @@ leveldb::Status oc_buffer::dump2file()
 	oc_page *ptr;
 	push_active();
 //	printf("vector_size: %zu\n", todump_.size());
-
+	printf("\n");
 	for (dump_iterator itr = todump_.begin();
 		itr != todump_.end();
 		++itr) {
@@ -387,6 +395,7 @@ leveldb::Status oc_buffer::dump2file()
 			i++;
 		}
 	}
+	printf("\n");
 	return s;
 }
 
@@ -413,6 +422,28 @@ leveldb::Status oc_buffer::dump2file(leveldb::WritableFile *f)
 	return s;
 }
 
+void oc_buffer::update_pagesinfo()
+{
+	oc_page *ptr;
+	char buf[200];
+	info_.clear();
+	push_active();
+	snprintf(buf, 200, "[oc_buffer pages info]\n number of pages: %zu, ", todump_.size());
+	info_.append(buf);
+	for (dump_iterator itr = todump_.begin();
+		itr != todump_.end();
+		++itr) {
+		ptr = *itr;
+		snprintf(buf, 200, " id%d(in_used_bytes:%zu),", ptr->idx_, ptr->content_len()); 
+		info_.append(buf);
+	}
+	info_.append("\n");
+}
+void oc_buffer::pr_pagesinfo()
+{
+	update_pagesinfo();
+	printf("pages info\n %s",info_.c_str());
+}
 //TESTS
 void oc_buffer::TEST_Basic()
 {
@@ -494,6 +525,43 @@ void oc_buffer::TEST_WritableFile()
 
 	free(buf);
 }
+
+void oc_buffer::TEST_WritableFile_Clear_Again()
+{
+	leveldb::WritableFile *file;
+	leveldb::Env *env = leveldb::Env::Default();
+	leveldb::Status s = env->NewWritableFile("oc_buffer::TEST_WritableFile.out", &file);
+	if (!s.ok()) {
+		printf("New file failed.\n");
+		return;
+	}
+
+	char *buf = (char *)malloc(sizeof(char) * 20);
+	buffill(buf, 20);
+	buf[19] = '\0';
+
+	printf("Append 20 bytes====\n");
+	this->append(buf, 20);
+
+	this->pr_pagesinfo();
+	printf("oc_buffer size: %zu", this->size());
+	this->dump2file();
+
+	printf("Clear====\n");
+	this->clear();
+
+	this->pr_pagesinfo();
+	printf("oc_buffer size: %zu", this->size());
+	this->dump2file();
+
+	printf("Append 20 bytes====\n");
+	this->append(buf, 20);
+
+	this->pr_pagesinfo();
+	printf("oc_buffer size: %zu", this->size());
+	this->dump2file();
+}
+
 
 uint32_t oc_buffer::CRCValue()
 {

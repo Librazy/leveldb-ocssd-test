@@ -24,8 +24,9 @@
 
 #include <inttypes.h>
 
-int kv_num = 1000;
-uint64_t file_number = 1;
+int kv_num = 1;
+uint64_t file_number1 = 1;
+uint64_t file_number2 = 20;
 std::string TestDBName = "db/OCSSD/resource/Test";
 
 int CMapLen;
@@ -89,10 +90,10 @@ void IterateKV(leveldb::TableBuilder *b)
 {
 	leveldb::Status s;
 	KVMap::iterator itr;
-//	printf("Insert Into File:\n");
+	printf("Insert Into File(ORG):\n");
 	int i = 0;
 	for (itr = KV.begin(); itr != KV.end(); ++itr, ++i) {
-//		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
+		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
 		b->Add(itr->first, itr->second);
 	}
 	if (s.ok()) {
@@ -104,21 +105,43 @@ void IterateKV(leveldb::TableBuilder *b)
 		b->Abandon();
 	}
 }
-void VerifyKVOrg(leveldb::Options& opt, uint64_t filenumber, uint64_t file_size)
+
+void IterateKV(leveldb::ocssd::TableBuilder *b)
+{
+	leveldb::Status s;
+	KVMap::iterator itr;
+	printf("Insert Into File(OC):\n");
+	int i = 0;
+	for (itr = KV.begin(); itr != KV.end(); ++itr, ++i) {
+		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
+		b->Add(itr->first, itr->second);
+	}
+	if (s.ok()) {
+		s = b->Finish();
+		if (s.ok()) {
+			printf("FileSize: %" PRIu64 "\n", b->FileSize());
+		}
+	} else {
+		b->Abandon();
+	}
+}
+
+void VerifyKV(leveldb::Options& opt, uint64_t filenumber, uint64_t file_size, const char *jobname)
 {
 	leveldb::Status s;
 	leveldb::Table *table = NULL;
 	leveldb::TableCache *table_cache;
 	int table_cache_size = opt.max_open_files - 10;
+	printf("===Verifying:[%s]===\n", jobname);
 
 	table_cache = new leveldb::TableCache(TestDBName, &opt, table_cache_size);
 
 	leveldb::Iterator *itr = table_cache->NewIterator(leveldb::ReadOptions(), filenumber, file_size, &table);
 	s = itr->status();
 	if (!s.ok()) {
-		printf("itr error: %s\n", s.ToString().c_str());
+		printf(" itr error: %s\n", s.ToString().c_str());
 	}else{
-		printf("itr status: %s\n", s.ToString().c_str());
+		printf(" itr status: %s\n", s.ToString().c_str());
 	}
 
 	//verify k,v
@@ -132,15 +155,12 @@ void VerifyKVOrg(leveldb::Options& opt, uint64_t filenumber, uint64_t file_size)
 			 }
 		 }  						   
 	}else{
-		printf("First Iterator not valid.\n");
+		printf(" First Iterator not valid.\n");
 	}
 
-	printf("Verify OK.\n");
+	printf(" Verify OK.\n");
 }
 
-void VerifyKVOc(leveldb::Env *env, const char *fname)
-{
-}
 
 void Construct_TESTKV()
 {
@@ -160,7 +180,7 @@ int table_builder()
 
 	leveldb::Options ldb_opts = SanitizeOptions(TestDBName, &internal_comparator, &internal_filter_policy, raw_opt);
 
-	leveldb::WritableFile * file1;
+	leveldb::WritableFile *file1, *file2;
 	leveldb::Env *env = leveldb::Env::Default();
 	leveldb::Status s;
 
@@ -173,19 +193,26 @@ int table_builder()
 
 	Construct_TESTKV();
 
-	std::string file_name = leveldb::TableFileName(TestDBName, file_number);
-
-	s = env->NewWritableFile(file_name, &file1);
+	std::string file_name1 = leveldb::TableFileName(TestDBName, file_number1);
+	std::string file_name2 = leveldb::TableFileName(TestDBName, file_number2);
+	s = env->NewWritableFile(file_name1, &file1);
 	if (!s.ok()) {
 		printf("New file1 failed.\n");
 		return -1;
 	}
 
+	s = env->NewWritableFile(file_name2, &file2);
+	if (!s.ok()) {
+		printf("New file2 failed.\n");
+		return -1;
+	}
+
 
 	leveldb::TableBuilder *builder_org = new leveldb::TableBuilder(ldb_opts, file1);
-
 	IterateKV(builder_org);
 
+	leveldb::ocssd::TableBuilder *builder_oc = new leveldb::ocssd::TableBuilder(ldb_opts, file2, ssd.PagePool());
+	IterateKV(builder_oc);
 	
 	if (s.ok()) {
 		s = file1->Sync();
@@ -197,9 +224,29 @@ int table_builder()
 		printf("File1 (Org) OK.\n");
 	}
 
-	VerifyKVOrg(ldb_opts, file_number, builder_org->FileSize());
+	if (s.ok()) {
+		s = file2->Sync();
+	}
+	if (s.ok()) {
+		s = file2->Close();
+	}
+	if (s.ok()) {
+		printf("File2 (OC) OK.\n");
+	}
+
+	if (builder_org->FileSize() != builder_oc->FileSize()) {
+		printf("Output Size Corrupted!\n");
+		return -1;
+	}
+
+
+	VerifyKV(ldb_opts, file_number1, builder_org->FileSize(), "ORG TB");
+	VerifyKV(ldb_opts, file_number2, builder_oc->FileSize(), "OC TB");
+
+
 
 	delete builder_org;
+	delete builder_oc;
 	return 0;
 }
 

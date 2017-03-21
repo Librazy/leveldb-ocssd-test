@@ -1,10 +1,9 @@
 
-// Copyright (c) 2011 The LevelDB Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file. See the AUTHORS file for names of contributors.
+/*
+ * TableBuilder for ocssd port. slightly modified from leveldb's original TableBuilder.
+ */
 
 #include "oc_table_builder.h"
-#include "oc_block_builder.h"
 
 #include <assert.h>
 #include "leveldb/comparator.h"
@@ -12,10 +11,15 @@
 #include "leveldb/filter_policy.h"
 #include "leveldb/options.h"
 
+#include "table/block_builder.h"
+
 #include "table/filter_block.h"
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+
+
+
 
 namespace leveldb {
 namespace ocssd {
@@ -47,7 +51,7 @@ struct ocssd::TableBuilder::Rep {
 
 	std::string compressed_output;
 
-	Rep(const leveldb::Options& opt, leveldb::WritableFile *f, oc_page_pool *p)
+	Rep(const leveldb::Options& opt, leveldb::WritableFile *f, ocssd::oc_page_pool *p)
 		: options(opt),
 		  index_block_options(opt),
 		  file(f),
@@ -66,7 +70,7 @@ struct ocssd::TableBuilder::Rep {
 };
 
 TableBuilder::TableBuilder(const Options& options, WritableFile *file, oc_page_pool *p)
-	: rep_(new Rep(options, file, oc_page_pool * p))
+	: rep_(new Rep(options, file, p))
 {
 	if (rep_->filter_block != NULL) {
 		rep_->filter_block->StartBlock(0);
@@ -228,7 +232,9 @@ void TableBuilder::WriteBlock(leveldb::BlockBuilder *block, BlockHandle *handle)
 }
 
 //original block is used when Tablebuilder::Finish.
-void TableBuilder::WriteRawBlock(const Slice& data, CompressionType, BlockHandle *handle)
+void TableBuilder::WriteRawBlock(const Slice& block_contents, 
+	CompressionType type, 
+	BlockHandle *handle)
 {
 	Rep *r = rep_;
 	handle->set_offset(r->offset);
@@ -264,7 +270,7 @@ void TableBuilder::WriteRawBlock(ocssd::oc_buffer *buffer,
 		EncodeFixed32(trailer + 1, crc32c::Mask(crc));
 		r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
 		if (r->status.ok()) {
-			r->offset += block_contents.size() + kBlockTrailerSize;
+			r->offset += buffer->size() + kBlockTrailerSize;
 		}
 	}
 }
@@ -291,7 +297,7 @@ Status TableBuilder::Finish()
 
 	// Write metaindex block
 	if (ok()) {
-		BlockBuilder meta_index_block(&r->options);
+		leveldb::BlockBuilder meta_index_block(&r->options); //here use the original blockbuilder
 		if (r->filter_block != NULL) {
 			// Add mapping from "filter.Name" to location of filter data
 			std::string key = "filter.";

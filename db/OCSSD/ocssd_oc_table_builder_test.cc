@@ -24,7 +24,7 @@
 
 #include <inttypes.h>
 
-
+int kv_num = 1000;
 uint64_t file_number = 1;
 std::string TestDBName = "db/OCSSD/resource/Test";
 
@@ -38,13 +38,28 @@ KVMap KV;
 void GetRandomString(std::string& s)
 {
 	int idx;
-	int len = rand() % 200;
+	int len = rand() % 200 + 1;
 	s.clear();
 	while (len) {
 		idx = rand() % CMapLen;
 		s.append(1, CMap[idx]);
 		len--;
 	}
+}
+
+bool verifyKV(const kvtype &k,const kvtype &v)
+{
+	KVMap::iterator itr;
+	itr = KV.find(k);
+	if (itr == KV.end()) {
+		printf("Verify Error: %s (not insert but found).\n", k.c_str());
+		return false;
+	}
+	if (itr->second != v) {
+		printf("Verify Error: key %s --> corrupt value %s, (should be %s).\n", k.c_str(), v.c_str(), itr->second.c_str());
+		return false;
+	}
+	return true;
 }
 
 void constructKV(int h)
@@ -74,9 +89,10 @@ void IterateKV(leveldb::TableBuilder *b)
 {
 	leveldb::Status s;
 	KVMap::iterator itr;
-	printf("Insert Into File:\n");
-	for (itr = KV.begin(); itr != KV.end(); ++itr) {
-		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
+//	printf("Insert Into File:\n");
+	int i = 0;
+	for (itr = KV.begin(); itr != KV.end(); ++itr, ++i) {
+//		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
 		b->Add(itr->first, itr->second);
 	}
 	if (s.ok()) {
@@ -108,14 +124,18 @@ void VerifyKVOrg(leveldb::Options& opt, uint64_t filenumber, uint64_t file_size)
 	//verify k,v
 	itr->SeekToFirst();
 	if (itr->Valid()) {
-		printf("Read From File:\n");
+//		printf("Read From File:\n");
 		 for (; itr->Valid(); itr->Next()) {
-			 printf("%s, %s\n", itr->key().ToString().c_str(),  itr->value().ToString().c_str()); 
-		 }
+//			 printf("%s, %s\n", itr->key().ToString().c_str(),  itr->value().ToString().c_str());
+			 if(!verifyKV(itr->key().ToString(), itr->value().ToString())){
+				 return;
+			 }
+		 }  						   
 	}else{
 		printf("First Iterator not valid.\n");
 	}
 
+	printf("Verify OK.\n");
 }
 
 void VerifyKVOc(leveldb::Env *env, const char *fname)
@@ -127,7 +147,8 @@ void Construct_TESTKV()
 	srand(0);
 	CMapLen = sizeof(CMap) / sizeof(CMap[0]);
 
-	constructKV(3);
+	constructKV(kv_num);
+	printf("TEST_KV Construct OK.\n");
 }
 
 int table_builder()
@@ -160,7 +181,9 @@ int table_builder()
 		return -1;
 	}
 
+
 	leveldb::TableBuilder *builder_org = new leveldb::TableBuilder(ldb_opts, file1);
+
 	IterateKV(builder_org);
 
 	

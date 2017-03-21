@@ -19,6 +19,10 @@
 #include <stdint.h>
 #include "leveldb/status.h"
 
+#ifdef USEOCSSD
+#include "../../db/OCSSD/oc_ssd.h"
+#endif
+
 namespace leveldb {
 
 class FileLock;
@@ -27,6 +31,7 @@ class RandomAccessFile;
 class SequentialFile;
 class Slice;
 class WritableFile;
+
 
 class Env {
  public:
@@ -39,6 +44,12 @@ class Env {
   //
   // The result of Default() belongs to leveldb and must never be deleted.
   static Env* Default();
+
+#ifdef USEOCSSD
+  // The hook for ocssd. 
+  // TODO: impl a helper class wrapper instead.
+  static Status DefaultSSD(ocssd::oc_ssd **ocssd_ptr);
+#endif
 
   // Create a brand new sequentially-readable file with the specified name.
   // On success, stores a pointer to the new file in *result and returns OK.

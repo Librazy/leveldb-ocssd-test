@@ -20,6 +20,11 @@
 #include "util/testharness.h"
 #include "util/testutil.h"
 
+#ifdef USEOCSSD
+#include "../db/OCSSD/oc_ssd.h"
+#include "../db/OCSSD/oc_table_builder.h"
+#endif
+
 namespace leveldb {
 
 // Return reverse of "key".
@@ -230,8 +235,19 @@ class TableConstructor: public Constructor {
   virtual Status FinishImpl(const Options& options, const KVMap& data) {
     Reset();
     StringSink sink;
+#ifdef USEOCSSD
+	ocssd::oc_ssd *ssd;
+	Status s1 = options.env->DefaultSSD(&ssd);
+	if (s1.ok()) {
+//		printf("(In TableTest)[ocssd] - OCSSD Constructed Good.\n");
+	}else{
+		printf("(In TableTest)[ocssd] - OCSSD Constructed Error.\n");
+		abort();
+	}
+	ocssd::TableBuilder builder(options, &sink, ssd->PagePool()); 
+#else
     TableBuilder builder(options, &sink);
-
+#endif
     for (KVMap::const_iterator it = data.begin();
          it != data.end();
          ++it) {

@@ -1,7 +1,6 @@
 #ifndef YWJ_OCSSD_OC_BLK_MNG_H
 #define YWJ_OCSSD_OC_BLK_MNG_H
 
-#include "ocssd.h"
 #include "oc_options.h"
 #include "oc_gc.h"
 
@@ -21,7 +20,7 @@
 namespace leveldb {
 namespace ocssd {
 
-class ocssd;
+class oc_ssd;
 class oc_GC;
 
 class oc_block_manager { //allocation is done in a granularity of <Block>
@@ -52,14 +51,17 @@ public:
 		const struct nvm_geo *limit;
 		Itr_rr_addr(struct rr_addr s, struct rr_addr e, const struct nvm_geo *g): st(s), ed(e), blks(e.Minus(s, g)), limit(g) { }
 		void SetBBTInCache(struct nvm_bbt **bbts, BlkState_t flag); 	//Increment by 1(Memory Operation)
+		
+
 		leveldb::Status Write();										//Increment by stripe(partial stripe)
 		leveldb::Status Read();											//Increment by stripe(partial stripe)
+		void TEST_Iteration();											//For Unit TEST
 	};
 
 	struct StripeDes {	//Stripe Descriptor: an parellel unit, consist of blocks, the blocks is [st, ed)
 		struct rr_addr st;
 		struct rr_addr ed;
-		StripeDes() : st(0), ed(0){ }
+		StripeDes() : st(), ed(){ }
 		StripeDes(struct rr_addr s, struct rr_addr e) : st(s), ed(e){ }
 	};
 
@@ -70,16 +72,32 @@ public:
 
 
 	bool ok();
+	void Pr_BlocksState(const char *fname = 0);
+
 
 	//TESTS
 	void TEST_Pr_Opt_Meta();
 	leveldb::Status TEST_Pr_BBT();
-	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt);
+	
+
 	void TEST_Lap();
 	void TEST_Add();
-	void TEST_Pr_UM();
+	void TEST_Pr_UM();	
+	void TEST_Itr_rr_addr();
 
-	
+	inline size_t ChunkSize()
+	{
+		return opt_.chunk_size;
+	}
+
+	size_t TEST_Get_ChunkSize()
+	{
+		return opt_.chunk_size;
+	}
+
+	static void TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt, const char *fname = 0);
+	static void TEST_RR_Addr_Pr(struct rr_addr x); 
+
 private:
 	/*  Problems to be issued:
 	 *  1. a file can be discontinuous in lun : (a file's size is changable at any time: support Append as a FS?)
@@ -94,7 +112,7 @@ private:
 
 
 
-	friend class ocssd;
+	friend class oc_ssd;
 	friend class oc_GC;
 
 	void def_ocblk_opt(struct Options *opt);
@@ -107,15 +125,15 @@ private:
 	void Add_blks(size_t blks);
 	void Set_stripe_blks_as(struct StripeDes des, BlkState_t flag);
 
-	oc_block_manager(ocssd *ssd);
+	oc_block_manager(oc_ssd *ssd, const struct nvm_geo *g);
 
 	/*
 	 * oc_block_manager factory function
 	 */
-	static leveldb::Status New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
+	static leveldb::Status New_oc_block_manager(oc_ssd *ssd,  oc_block_manager **oc_blk_mng_ptr);
 
-	ocssd *const ssd_;
-	const struct nvm_geo *const geo_;
+	oc_ssd *const ssd_;
+	const struct nvm_geo * geo_;
 	struct nvm_bbt **bbts_;
 	int bbts_length_;
 	int blks_length_;

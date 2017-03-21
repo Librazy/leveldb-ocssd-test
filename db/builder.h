@@ -7,6 +7,10 @@
 
 #include "leveldb/status.h"
 
+#ifdef USEOCSSD
+#include "OCSSD/oc_ssd.h"
+#endif
+
 namespace leveldb {
 
 struct Options;
@@ -27,7 +31,11 @@ extern Status BuildTable(const std::string& dbname,
                          const Options& options,
                          TableCache* table_cache,
                          Iterator* iter,
-                         FileMetaData* meta);
+#ifdef USEOCSSD
+						 FileMetaData *meta, ocssd::oc_page_pool *pp);
+#else
+						 FileMetaData* meta);
+#endif
 
 }  // namespace leveldb
 

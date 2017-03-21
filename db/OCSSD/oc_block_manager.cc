@@ -1,8 +1,11 @@
+#include "oc_ssd.h"
 #include "oc_block_manager.h"
 
 #include "util/mutexlock.h"
 
+#include <time.h>
 #include <cassert>
+#include <set>
 
 namespace leveldb {
 namespace ocssd {
@@ -47,9 +50,6 @@ static inline int _pl_blk2_bbtblks_idx(int pl, int blk, const struct nvm_geo *ge
 	return blk * geo->nplanes + pl;
 }
 
-
-
-
 static void my_nvm_bbt_state_pr(int state)
 {
 	switch (state) {
@@ -66,6 +66,39 @@ static void my_nvm_bbt_state_pr(int state)
 		nvm_bbt_state_pr(state);
 		break;
 	}
+}
+
+static void my_nvm_bbt_state_pr_verbose(int state, FILE* fp = stdout)
+{
+	switch (state) {
+	case BLK_UNUSED:
+		fprintf(fp, "00");
+		break;
+	case BLK_USED:
+		fprintf(fp, "##");
+		break;
+	case BLK_INVALID:
+		fprintf(fp, "!!");
+		break;
+	default:
+		fprintf(fp, "NA");	
+		break;
+	}
+}
+
+static void gettimestr(std::string &str)
+{
+	char buf[32];
+    time_t timep;		
+    struct tm *p;
+	int ret;
+    time(&timep);
+    p = gmtime(&timep);
+	str.clear();
+    ret = snprintf(buf, 32, "%d/%d/%d", (1900+p->tm_year), (1+p->tm_mon), p->tm_mday);
+	str.append(buf);
+    ret = snprintf(buf, 32, " %d:%d:%d", p->tm_hour, p->tm_min, p->tm_sec);
+	str.append(buf);
 }
 
 
@@ -101,8 +134,27 @@ void oc_block_manager::TEST_Lap()
 
 void oc_block_manager::TEST_Pr_UM()
 {
-	printf("Blk%u,<L%uP%u>", next.block, GetLun(next.lap), GetPlane(next.lap));
+	TEST_RR_Addr_Pr(next);
 }
+
+void oc_block_manager::TEST_RR_Addr_Pr(struct rr_addr x)
+{
+	printf("Blk%u,<L%uP%u>", x.block, GetLun(x.lap), GetPlane(x.lap));
+}
+
+void oc_block_manager::TEST_Itr_rr_addr()
+{
+	rr_addr st, ed;
+	st.lap = MakeLunAndPlane(0, 1);
+	st.block = 1;
+
+	ed.lap = MakeLunAndPlane(2, 0);
+	ed.block = 3;
+
+	Itr_rr_addr itr(st, ed, geo_);
+	itr.TEST_Iteration();
+}
+
 
 bool oc_block_manager::rr_addr::ok(const struct nvm_geo *limit)
 {
@@ -248,6 +300,25 @@ void oc_block_manager::Itr_rr_addr::SetBBTInCache(struct nvm_bbt **bbts, BlkStat
 	}
 }
 
+void oc_block_manager::Itr_rr_addr::TEST_Iteration()
+{
+	uint32_t l, p;
+	int i = 1;
+	while (blks) {
+
+		oc_block_manager::TEST_RR_Addr_Pr(st);
+		printf(" -> ");
+		if (0 == i % 5) {
+			printf("\n");
+		}
+		st.Increment(limit);
+		blks--;
+		i++;
+	}
+	printf("\n");
+}
+
+
 leveldb::Status oc_block_manager::Itr_rr_addr::Write()
 {
 	leveldb::Status s;
@@ -328,6 +399,43 @@ void oc_block_manager::TEST_Pr_Opt_Meta()
 	printf("Next LAP: <L%dP%d> Block:%u\n", GetLun(next.lap), GetPlane(next.lap), next.block); 
 }
 
+//Block-lun-plane addressing
+void oc_block_manager::Pr_BlocksState(const char *fname)
+{
+	size_t b, l, p;
+	int bbt_idx, blk_idx;
+	FILE* fp;
+	std::string info;
+	if(fname && !(fp = fopen(fname, "w+"))){
+		fp = stdout;
+	}
+	//print infos
+	gettimestr(info);
+	fprintf(fp, "Block State Table(%s)\n", info.c_str());
+	//print title.
+	fprintf(fp, "       ");
+	for (l = 0; l < geo_->nluns; ++l) {
+		fprintf(fp, "L%zu     ", l);
+	}
+	fprintf(fp, "\n");
+
+	for (b = 0; b < geo_->nblocks; ++b) {
+		fprintf(fp, "B%4zu: ", b);
+		for (l = 0; l < geo_->nluns; ++l) {
+			for (p = 0; p < geo_->nplanes; ++p) {
+				bbt_idx = _ch_lun2_bbt_idx(CH_THIS, l, geo_);
+				blk_idx = _pl_blk2_bbtblks_idx(p, b, geo_);
+				my_nvm_bbt_state_pr_verbose(bbts_[bbt_idx]->blks[blk_idx], fp);
+				fprintf(fp, " ");
+			}
+			fprintf(fp, " ");
+		}
+		fprintf(fp, "\n");
+	}
+	if (fp != stdout) {
+		fclose(fp);
+	}
+}
 
 
 leveldb::Status oc_block_manager::TEST_Pr_BBT()
@@ -336,7 +444,7 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 	struct nvm_addr lun_addr;
 	struct nvm_ret ret;
 	const struct nvm_bbt *ptr, *ptr2;
-
+	char fname[64];
 //	printf("BBTs: %p %p\n", bbts_, ssd_->dev_->bbts);
 
 
@@ -348,8 +456,8 @@ leveldb::Status oc_block_manager::TEST_Pr_BBT()
 //		if (ptr != (ptr2 = nvm_bbt_get(ssd_->dev_, lun_addr, &ret))) {
 //			printf("Ptr!: %p, %p, %p\n", ptr, ssd_->dev_->bbts[_ch_lun2_bbt_idx(CH_THIS, i, geo_)],ptr2);
 //		}
-
-		TEST_My_nvm_bbt_pr(i, ptr);
+		sprintf(fname, "BBT_%d", i);
+		TEST_My_nvm_bbt_pr(i, ptr, fname);
 	}
 	return leveldb::Status::OK();
 
@@ -358,12 +466,14 @@ BBT_ERR:
 }
 
 #define PRBBT_VERBOSE
-
-void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt)
+void oc_block_manager::TEST_My_nvm_bbt_pr(int lun, const struct nvm_bbt *bbt, const char *fname)
 {
 	int nnotfree = 0;
 	const int Pr_num = 4;
 	int pred = 0, pr_sr = 0;
+	if (fname && !(freopen(fname, "w",stdout))) {
+		
+	}
 	if (!bbt) {
 		printf("bbt { NULL }\n");
 		return;
@@ -489,7 +599,7 @@ void oc_block_manager::Init()
 	InitClean();
 }
 
-oc_block_manager::oc_block_manager(ocssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo(ssd->dev_))
+oc_block_manager::oc_block_manager(oc_ssd *ssd, const struct nvm_geo *g) : ssd_(ssd), geo_(g)
 {
 	def_ocblk_opt(&opt_);
 	Init();
@@ -498,9 +608,9 @@ oc_block_manager::oc_block_manager(ocssd *ssd) : ssd_(ssd), geo_(nvm_dev_get_geo
 /*
  * 
  */
-leveldb::Status oc_block_manager::New_oc_block_manager(ocssd *ssd,  oc_block_manager **oc_blk_mng_ptr)
+leveldb::Status oc_block_manager::New_oc_block_manager(oc_ssd *ssd,  oc_block_manager **oc_blk_mng_ptr)
 {
-	oc_block_manager *ptr = new oc_block_manager(ssd);
+	oc_block_manager *ptr = new oc_block_manager(ssd, ssd->Geo()); 
 	*oc_blk_mng_ptr = ptr->ok() ? ptr : NULL;
 	return ptr->s;
 }

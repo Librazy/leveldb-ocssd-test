@@ -26,6 +26,10 @@
 #include "util/posix_logger.h"
 #include "util/env_posix_test_helper.h"
 
+#ifdef USEOCSSD
+#include "../db/OCSSD/oc_ssd.h"
+#endif
+
 namespace leveldb {
 
 namespace {
@@ -674,7 +678,12 @@ void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
 static Env* default_env;
+#ifdef USEOCSSD
+static ocssd::oc_ssd *ssdex;
+static void InitDefaultEnv() { default_env = new PosixEnv; ssdex = new ocssd::oc_ssd(); }
+#else
 static void InitDefaultEnv() { default_env = new PosixEnv; }
+#endif
 
 void EnvPosixTestHelper::SetReadOnlyFDLimit(int limit) {
   assert(default_env == NULL);
@@ -690,5 +699,13 @@ Env* Env::Default() {
   pthread_once(&once, InitDefaultEnv);
   return default_env;
 }
+
+#ifdef USEOCSSD
+Status Env::DefaultSSD(ocssd::oc_ssd **ocssd_ptr){
+	Status s = ssdex->s;
+	*ocssd_ptr = s.ok() ? ssdex : NULL;
+	return s;
+}
+#endif
 
 }  // namespace leveldb

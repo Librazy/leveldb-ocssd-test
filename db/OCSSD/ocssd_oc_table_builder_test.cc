@@ -24,7 +24,7 @@
 
 #include <inttypes.h>
 
-int kv_num = 1;
+int kv_num = 1000;
 uint64_t file_number1 = 1;
 uint64_t file_number2 = 20;
 std::string TestDBName = "db/OCSSD/resource/Test";
@@ -93,7 +93,7 @@ void IterateKV(leveldb::TableBuilder *b)
 	printf("Insert Into File(ORG):\n");
 	int i = 0;
 	for (itr = KV.begin(); itr != KV.end(); ++itr, ++i) {
-		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
+//		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
 		b->Add(itr->first, itr->second);
 	}
 	if (s.ok()) {
@@ -113,7 +113,7 @@ void IterateKV(leveldb::ocssd::TableBuilder *b)
 	printf("Insert Into File(OC):\n");
 	int i = 0;
 	for (itr = KV.begin(); itr != KV.end(); ++itr, ++i) {
-		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
+//		printf("%s, %s\n", itr->first.c_str(), itr->second.c_str());
 		b->Add(itr->first, itr->second);
 	}
 	if (s.ok()) {

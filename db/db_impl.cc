@@ -33,6 +33,10 @@
 #include "util/logging.h"
 #include "util/mutexlock.h"
 
+#ifdef USEOCSSD
+#include "OCSSD/oc_table_builder.h"
+#endif
+
 namespace leveldb {
 
 const int kNumNonTableCacheFiles = 10;
@@ -67,8 +71,11 @@ struct DBImpl::CompactionState {
 
   // State kept for output being generated
   WritableFile* outfile;
+#ifdef USEOCSSD
+  ocssd::TableBuilder* builder;
+#else
   TableBuilder* builder;
-
+#endif
   uint64_t total_bytes;
 
   Output* current_output() { return &outputs[outputs.size()-1]; }
@@ -143,6 +150,14 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
 
   versions_ = new VersionSet(dbname_, &options_, table_cache_,
                              &internal_comparator_);
+#ifdef USEOCSSD
+  Status s = env_->DefaultSSD(&ssd_);
+  if (s.ok()) {
+//	  printf("(In DBImpl)[ocssd] - OCSSD Constructed Good.\n");
+  }else{
+	  printf("(In DBImpl)[ocssd] - OCSSD Constructed Error.\n");
+  }
+#endif
 }
 
 DBImpl::~DBImpl() {
@@ -499,7 +514,11 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
+#ifdef USEOCSSD
+	s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, ssd_->PagePool()); 
+#else
     s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+#endif
     mutex_.Lock();
   }
 
@@ -805,7 +824,11 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
+#ifdef USEOCSSD
+	compact->builder = new ocssd::TableBuilder(options_, compact->outfile, ssd_->PagePool()); 
+#else
     compact->builder = new TableBuilder(options_, compact->outfile);
+#endif
   }
   return s;
 }

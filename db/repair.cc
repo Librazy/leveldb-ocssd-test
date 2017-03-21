@@ -38,6 +38,13 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 
+#ifdef USEOCSSD
+#include "OCSSD/oc_ssd.h"
+#include "OCSSD/oc_table_builder.h"
+#include <stdio.h>
+#endif
+
+
 namespace leveldb {
 
 namespace {
@@ -55,6 +62,15 @@ class Repairer {
         next_file_number_(1) {
     // TableCache can be small since we expect each table to be opened once.
     table_cache_ = new TableCache(dbname_, &options_, 10);
+#ifdef USEOCSSD
+    Status s = env_->DefaultSSD(&ssd_);
+  	if (s.ok()) {
+//      printf("(In Repair)[ocssd] - OCSSD Constructed Good.\n");
+  	}else{
+        printf("(In Repair)[ocssd] - OCSSD Constructed Error.\n");
+    }
+#endif
+
   }
 
   ~Repairer() {
@@ -99,6 +115,9 @@ class Repairer {
 
   std::string const dbname_;
   Env* const env_;
+#ifdef USEOCSSD
+  ocssd::oc_ssd *ssd_;
+#endif
   InternalKeyComparator const icmp_;
   InternalFilterPolicy const ipolicy_;
   Options const options_;
@@ -224,7 +243,11 @@ class Repairer {
     FileMetaData meta;
     meta.number = next_file_number_++;
     Iterator* iter = mem->NewIterator();
+#ifdef USEOCSSD
+    status = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, ssd_->PagePool()); 
+#else
     status = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+#endif
     delete iter;
     mem->Unref();
     mem = NULL;
@@ -329,8 +352,11 @@ class Repairer {
     if (!s.ok()) {
       return;
     }
+#ifdef USEOCSSD
+    ocssd::TableBuilder *builder = new ocssd::TableBuilder(options_, file, ssd_->PagePool()); 
+#else
     TableBuilder* builder = new TableBuilder(options_, file);
-
+#endif
     // Copy data.
     Iterator* iter = NewTableIterator(t.meta);
     int counter = 0;

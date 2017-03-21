@@ -5,6 +5,7 @@
 
 #include <time.h>
 #include <cassert>
+#include <set>
 
 namespace leveldb {
 namespace ocssd {

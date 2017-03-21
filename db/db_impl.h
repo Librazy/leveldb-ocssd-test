@@ -15,6 +15,10 @@
 #include "port/port.h"
 #include "port/thread_annotations.h"
 
+#ifdef USEOCSSD
+#include "OCSSD/oc_ssd.h"
+#endif
+
 namespace leveldb {
 
 class MemTable;
@@ -120,6 +124,11 @@ class DBImpl : public DB {
 
   // Constant after construction
   Env* const env_;
+
+#ifdef USEOCSSD
+  ocssd::oc_ssd * ssd_;
+#endif
+
   const InternalKeyComparator internal_comparator_;
   const InternalFilterPolicy internal_filter_policy_;
   const Options options_;  // options_.comparator == &internal_comparator_

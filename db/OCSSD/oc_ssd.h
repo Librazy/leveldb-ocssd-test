@@ -4,8 +4,6 @@
 //DB headers
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
-#include "db/version_edit.h"
-#include "db/dbformat.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
 
@@ -15,8 +13,9 @@
 
 #include "oc_file.h"
 
-#define BOOL2STR(b) ((b) ? "true" : "false")
+#include <set>
 
+#define BOOL2STR(b) ((b) ? "true" : "false")
 
 namespace leveldb {
 namespace ocssd {

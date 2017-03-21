@@ -12,6 +12,11 @@
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
 
+#ifdef USEOCSSD
+#include "OCSSD/oc_page_cache.h"
+#include "OCSSD/oc_table_builder.h"
+#endif
+
 namespace leveldb {
 
 Status BuildTable(const std::string& dbname,
@@ -19,7 +24,11 @@ Status BuildTable(const std::string& dbname,
                   const Options& options,
                   TableCache* table_cache,
                   Iterator* iter,
+#ifdef USEOCSSD
+				  FileMetaData *meta, ocssd::oc_page_pool *pp) { 
+#else
                   FileMetaData* meta) {
+#endif
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
@@ -31,8 +40,11 @@ Status BuildTable(const std::string& dbname,
     if (!s.ok()) {
       return s;
     }
-
+#ifdef USEOCSSD
+	ocssd::TableBuilder *builder = new ocssd::TableBuilder(options, file, pp);
+#else
     TableBuilder* builder = new TableBuilder(options, file);
+#endif
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();

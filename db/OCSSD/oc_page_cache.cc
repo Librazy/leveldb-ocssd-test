@@ -49,7 +49,6 @@ size_t oc_page::Append(const char *str, size_t len)
 	size_t actual = NVM_MIN(Left(), len);
 	memcpy(ofs_, str, actual);
 	ofs_ = reinterpret_cast<void *>(reinterpret_cast<char *>(ofs_) + actual);
-	assert(ofs_ - ptr_ <= size_);
 	return actual;
 }
 
